@@ -15,7 +15,7 @@ Windows 桌面用量工具：三个透明任务栏圆环（**Codex**、**DeepSee
 | --- | --- | --- | --- |
 | Codex | 5h 剩余百分比 | 5h 剩余比例 | 每周剩余比例（详情卡片含重置卡数量） |
 | DeepSeek | ≥1 元显示整数，不足 1 元显示两位小数 | 余额 / 满圈基准；颜色表示余额预警 | 距下次峰谷切换的剩余时间比例；峰期红、谷期绿 |
-| Antigravity | Gemini 5h 剩余百分比 | Gemini 5h 剩余比例（默认粉色 `#F988B3`） | Gemini 本周剩余比例（默认浅卡其 `#E2D2AE`，支持右键切换配色） |
+| Antigravity | Gemini 5h 剩余百分比 | Gemini 5h 剩余比例 | Gemini 本周剩余比例（支持右键切换配色） |
 
 ### 整合版 `GRings`（推荐）
 - `GRings/` 目录将 **Codex、DeepSeek、Antigravity 三个圆环** 整合为单个程序 `GRings.exe`（附多分辨率透明圆形双环图标），双击即可一次性启动全部三环；右键任一圆环均可选择「关闭此圆环」或「退出全部三环」。
