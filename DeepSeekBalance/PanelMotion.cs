@@ -93,7 +93,7 @@ sealed class PanelMotion:IDisposable {
  void Finish(int myGen,bool isOpening){
   if(disposed||generation!=myGen)return;
   running=false;clock.Stop();EnableHighRes(false);
-  if(isOpening&&!owner.IsDisposed){owner.Bounds=fullBounds;restore();owner.Show();owner.Update();}
+  if(isOpening&&!owner.IsDisposed){owner.Bounds=fullBounds;restore();}
   if(surface!=null){surface.Dispose();surface=null;}
  }
  static int Mix(int a,int b,double amount){return (int)Math.Round(a+(b-a)*amount);}

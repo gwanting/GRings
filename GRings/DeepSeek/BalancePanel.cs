@@ -14,6 +14,9 @@ sealed class BalancePanel:Form {
  [StructLayout(LayoutKind.Sequential)]struct CompositionData{public int Attribute;public IntPtr Data;public int Size;}
  [DllImport("user32.dll")]static extern int SetWindowCompositionAttribute(IntPtr window,ref CompositionData data);
  [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr window,int message,IntPtr wparam,IntPtr lparam);
+ [DllImport("user32.dll")]static extern IntPtr BeginDeferWindowPos(int count);
+ [DllImport("user32.dll")]static extern IntPtr DeferWindowPos(IntPtr hdwp,IntPtr hwnd,IntPtr insertAfter,int x,int y,int cx,int cy,uint flags);
+ [DllImport("user32.dll")]static extern bool EndDeferWindowPos(IntPtr hdwp);
  bool glass;
  readonly PanelAppearance appearance=PanelAppearance.Load();
  Panel appearanceView;ComboBox theme;TransparencySlider transparency;Label transparencyText,savedText;bool syncing;
@@ -24,7 +27,32 @@ sealed class BalancePanel:Form {
  public bool IsOpen{get{return motion==null?Visible:motion.TargetVisible;}}
  public bool IsPanelShown{get{return Visible||(motion!=null&&motion.Running);}}
  public void HideImmediately(){if(motion!=null){motion.Dispose();motion=null;}Hide();}
- public void ShowAnimated(Point anchor){try{if(motion==null)motion=new PanelMotion(this,CaptureMotionFrame,SyncBackdrop);motion.Show(anchor);}catch{if(motion!=null)motion.Dispose();motion=null;Opacity=1;ApplyAppearance();Show();}}
+ public void ShowAnimated(Point anchor){try{if(motion==null)motion=new PanelMotion(this,CaptureMotionFrame,RevealWithBackdrop);motion.Show(anchor);}catch{if(motion!=null)motion.Dispose();motion=null;Opacity=1;ApplyAppearance();Show();}}
+ void RevealWithBackdrop(){
+  suppressBackdrop=true;
+  try{
+   if(backdrop==null&&!Disposing&&!IsDisposed){backdrop=new PanelBackdrop();backdrop.BackgroundMouseDown+=ForwardBackdropInput;}
+   bool showBackdrop=backdrop!=null&&!backdrop.IsDisposed&&appearance.BackgroundAlpha>0;
+   if(showBackdrop){
+    backdrop.Configure(appearance.Light,appearance.Tint,appearance.BackgroundAlpha,Bounds);
+    IntPtr unused=backdrop.Handle;
+   }
+   IntPtr fgHandle=Handle;
+   IntPtr hdwp=BeginDeferWindowPos(showBackdrop?2:1);
+   if(hdwp!=IntPtr.Zero){
+    const uint flags=0x0010|0x0040|0x0200; // SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOOWNERZORDER
+    hdwp=DeferWindowPos(hdwp,fgHandle,new IntPtr(-1),Left,Top,Width,Height,flags);
+    if(showBackdrop&&hdwp!=IntPtr.Zero)hdwp=DeferWindowPos(hdwp,backdrop.Handle,fgHandle,Left,Top,Width,Height,flags);
+    if(hdwp!=IntPtr.Zero)EndDeferWindowPos(hdwp);
+   }
+   if(!Visible)Show();
+   if(showBackdrop&&!backdrop.Visible)backdrop.PlaceBehind(Handle);
+   Update();
+   if(showBackdrop)backdrop.Update();
+  }finally{
+   suppressBackdrop=false;
+  }
+ }
  public void HideAnimated(Point anchor){try{if(motion==null){Hide();return;}motion.Hide(anchor);}catch{if(motion!=null)motion.Dispose();motion=null;Hide();}}
  Bitmap CaptureMotionFrame(){
   if(cachedMotionFrame!=null)return (Bitmap)cachedMotionFrame.Clone();
@@ -45,7 +73,7 @@ sealed class BalancePanel:Form {
  protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);ApplyAppearance();}
  void ApplyAppearance(){
   TransparencyKey=Color.Black;
-  if(IsHandleCreated)try{int dark=appearance.Light?0:1,rounded=2,border=unchecked((int)0xFFFFFFFE);DwmSetWindowAttribute(Handle,20,ref dark,4);DwmSetWindowAttribute(Handle,33,ref rounded,4);DwmSetWindowAttribute(Handle,34,ref border,4);var margins=new GlassMargins();var accent=new AccentPolicy();int size=Marshal.SizeOf(accent);IntPtr memory=Marshal.AllocHGlobal(size);try{Marshal.StructureToPtr(accent,memory,false);var data=new CompositionData{Attribute=19,Data=memory,Size=size};SetWindowCompositionAttribute(Handle,ref data);}finally{Marshal.FreeHGlobal(memory);}DwmExtendFrameIntoClientArea(Handle,ref margins);}catch{}
+  if(IsHandleCreated)try{int dark=appearance.Light?0:1,noRound=1,border=unchecked((int)0xFFFFFFFE);DwmSetWindowAttribute(Handle,20,ref dark,4);DwmSetWindowAttribute(Handle,33,ref noRound,4);DwmSetWindowAttribute(Handle,34,ref border,4);var margins=new GlassMargins();var accent=new AccentPolicy();int size=Marshal.SizeOf(accent);IntPtr memory=Marshal.AllocHGlobal(size);try{Marshal.StructureToPtr(accent,memory,false);var data=new CompositionData{Attribute=19,Data=memory,Size=size};SetWindowCompositionAttribute(Handle,ref data);}finally{Marshal.FreeHGlobal(memory);}DwmExtendFrameIntoClientArea(Handle,ref margins);}catch{}
   if(backdrop==null&&!Disposing&&!IsDisposed){backdrop=new PanelBackdrop();backdrop.BackgroundMouseDown+=ForwardBackdropInput;}
   if(backdrop!=null&&!backdrop.IsDisposed&&IsHandleCreated)backdrop.Configure(appearance.Light,appearance.Tint,appearance.BackgroundAlpha,Bounds);
   glass=backdrop!=null&&backdrop.AcrylicEnabled;BackColor=Color.Black;ForeColor=appearance.Light?Color.FromArgb(24,35,49):Color.White;StyleChildren(this);SyncBackdrop();
