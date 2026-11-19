@@ -15,9 +15,7 @@ sealed class BalancePanel:Form {
  [DllImport("dwmapi.dll")]static extern int DwmFlush();
  [DllImport("user32.dll")]static extern int SetWindowCompositionAttribute(IntPtr window,ref CompositionData data);
  [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr window,int message,IntPtr wparam,IntPtr lparam);
- [DllImport("user32.dll")]static extern IntPtr BeginDeferWindowPos(int count);
- [DllImport("user32.dll")]static extern IntPtr DeferWindowPos(IntPtr hdwp,IntPtr hwnd,IntPtr insertAfter,int x,int y,int cx,int cy,uint flags);
- [DllImport("user32.dll")]static extern bool EndDeferWindowPos(IntPtr hdwp);
+ [DllImport("user32.dll")]static extern bool SetWindowPos(IntPtr hwnd,IntPtr insertAfter,int x,int y,int cx,int cy,uint flags);
  bool glass;
  readonly PanelAppearance appearance=PanelAppearance.Load();
  Panel appearanceView;ComboBox theme;TransparencySlider transparency;Label transparencyText,savedText;bool syncing;
@@ -36,26 +34,22 @@ sealed class BalancePanel:Form {
    bool showBackdrop=backdrop!=null&&!backdrop.IsDisposed&&appearance.BackgroundAlpha>0;
    if(showBackdrop){
     backdrop.Configure(appearance.Light,appearance.Tint,appearance.BackgroundAlpha,Bounds);
-    IntPtr unused=backdrop.Handle;
+    if(!backdrop.Visible)backdrop.Show();
    }
    if(!Visible)Show();
    IntPtr fgHandle=Handle;
-   bool hasMotion=motionHandle!=IntPtr.Zero;
-   IntPtr hdwp=BeginDeferWindowPos((hasMotion?1:0)+(showBackdrop?2:1));
-   if(hdwp!=IntPtr.Zero){
-    const uint showFlags=0x0010|0x0040|0x0200; // SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOOWNERZORDER
-    const uint keepFlags=0x0001|0x0002|0x0010|0x0200; // SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER
-    if(hasMotion)hdwp=DeferWindowPos(hdwp,motionHandle,new IntPtr(-1),0,0,0,0,keepFlags);
-    if(hdwp!=IntPtr.Zero)hdwp=DeferWindowPos(hdwp,fgHandle,hasMotion?motionHandle:new IntPtr(-1),Left,Top,Width,Height,showFlags);
-    if(showBackdrop&&hdwp!=IntPtr.Zero)hdwp=DeferWindowPos(hdwp,backdrop.Handle,fgHandle,Left,Top,Width,Height,showFlags);
-    if(hdwp!=IntPtr.Zero)EndDeferWindowPos(hdwp);
+   const uint showFlags=0x0010|0x0040|0x0200; // SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOOWNERZORDER
+   const uint keepFlags=0x0001|0x0002|0x0010|0x0200;
+   if(motionHandle!=IntPtr.Zero){
+    SetWindowPos(motionHandle,new IntPtr(-1),0,0,0,0,keepFlags);
+    SetWindowPos(fgHandle,motionHandle,Left,Top,Width,Height,showFlags);
+   }else{
+    SetWindowPos(fgHandle,new IntPtr(-1),Left,Top,Width,Height,showFlags);
    }
-   if(showBackdrop&&!backdrop.Visible)backdrop.PlaceBehind(fgHandle);
+   if(showBackdrop)SetWindowPos(backdrop.Handle,fgHandle,Left,Top,Width,Height,showFlags);
    Update();
    if(showBackdrop)backdrop.Update();
-   // Wait one VSync (~6ms on high-refresh displays) while MotionSurface still covers the panel,
-   // so DWM finishes compositing the Acrylic blur + foreground before MotionSurface disappears.
-   if(hasMotion)try{DwmFlush();}catch{}
+   if(motionHandle!=IntPtr.Zero)try{DwmFlush();}catch{}
   }finally{
    suppressBackdrop=false;
   }
@@ -63,14 +57,14 @@ sealed class BalancePanel:Form {
  public void HideAnimated(Point anchor){try{if(motion==null){Hide();return;}motion.Hide(anchor);}catch{if(motion!=null)motion.Dispose();motion=null;Hide();}}
  Bitmap CaptureMotionFrame(){
   if(cachedMotionFrame!=null)return (Bitmap)cachedMotionFrame.Clone();
-  bool wasVisible=Visible;Point originalLocation=Location;double originalOpacity=Opacity;Bitmap raw=null;
+  bool wasVisible=Visible;Point originalLocation=Location;Bitmap raw=null;
   suppressBackdrop=true;
   try{
-   if(!wasVisible){Location=new Point(-32000,-32000);Opacity=0;Show();}
+   if(!wasVisible){Location=new Point(-32000,-32000);Show();}
    raw=new Bitmap(Width,Height,System.Drawing.Imaging.PixelFormat.Format24bppRgb);
    DrawToBitmap(raw,new Rectangle(0,0,Width,Height));
   }finally{
-   if(!wasVisible){Hide();Opacity=originalOpacity;Location=originalLocation;}
+   if(!wasVisible){Hide();Location=originalLocation;}
    suppressBackdrop=false;
    if(wasVisible)SyncBackdrop();
   }

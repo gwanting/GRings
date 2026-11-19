@@ -22,6 +22,7 @@ sealed class PanelBackdrop:Form {
  public event Action<Point> BackgroundMouseMove;
  protected override bool ShowWithoutActivation{get{return true;}}
  protected override CreateParams CreateParams{get{var value=base.CreateParams;value.ExStyle|=0x08000000|0x80|0x80000;return value;}}
+ protected override void WndProc(ref Message m){if(m.Msg==0x21){m.Result=new IntPtr(3);return;}base.WndProc(ref m);}
  public PanelBackdrop(){Text="DeepSeek 面板背景";FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;TopMost=true;BackColor=Color.Black;StartPosition=FormStartPosition.Manual;AutoScaleMode=AutoScaleMode.None;}
  public void Configure(bool isLight,int color,byte opacity,Rectangle bounds){bool changed=light!=isLight||tint!=color||alpha!=opacity;light=isLight;tint=color;alpha=opacity;if(Bounds!=bounds)Bounds=bounds;if(!IsHandleCreated){IntPtr unused=Handle;}else if(changed)Apply();}
  protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);Apply();}
