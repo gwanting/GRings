@@ -9,7 +9,7 @@ sealed class BalanceReference {
  public BalanceReference(string file){
   path=file;
   try{
-   string source=File.Exists(path)?path:Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"ChatGPT","程序安装","DeepSeekBalance","build","balance-reference.json");
+   string source=File.Exists(path)?path:Path.Combine(PlatformUsage.Folder,"balance-reference.json");
    if(!File.Exists(source))return;
    var doc=DeepSeekClient.Json(File.ReadAllText(source));decimal amount;if(!decimal.TryParse(Convert.ToString(doc["amount"],CultureInfo.InvariantCulture),NumberStyles.Number,CultureInfo.InvariantCulture,out amount)||amount<0)return;Amount=amount;Currency=Convert.ToString(doc["currency"]);Automatic=Convert.ToBoolean(doc["automatic"]);
   }catch(IOException){}catch(UnauthorizedAccessException){}catch(ArgumentException){}catch(InvalidOperationException){}catch(System.Collections.Generic.KeyNotFoundException){}

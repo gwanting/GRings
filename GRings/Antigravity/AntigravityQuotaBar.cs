@@ -117,7 +117,7 @@ namespace AntigravityQuotaBar {
             menu.Items.Add("打开 agy 登录终端", null, (s, e) => LaunchLoginAgy());
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("关于", null, (s, e) => MessageBox.Show(this,
-                "Antigravity 用量圆环\n\n外环：Gemini 5 小时剩余额度\n内环：Gemini 本周剩余额度\n数据源：官方 agy CLI (/usage)\n\n单击展开卡片，双击切换黑白数字，右键可切换配色。",
+                "Antigravity 用量圆环\n\n圆环设计与制作：Wanting\nCopyright © 2026 Wanting\n\nMIT License\n\nhttps://github.com/gwanting/GRings",
                 "关于 Antigravity 用量圆环", MessageBoxButtons.OK, MessageBoxIcon.Information));
             menu.Items.Add("关闭此圆环", null, (s, e) => Close());
             menu.Items.Add("退出全部三环", null, (s, e) => QuotaRings.Program.ExitAll());

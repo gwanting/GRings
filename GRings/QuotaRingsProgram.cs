@@ -4,8 +4,10 @@ using System.Threading;
 using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("GRings")]
-[assembly: System.Reflection.AssemblyDescription("Codex + DeepSeek + Antigravity 任务栏整合三环")]
+[assembly: System.Reflection.AssemblyDescription("圆环设计与制作：Wanting")]
+[assembly: System.Reflection.AssemblyCompany("Wanting")]
 [assembly: System.Reflection.AssemblyProduct("GRings")]
+[assembly: System.Reflection.AssemblyCopyright("Copyright © 2026 Wanting")]
 
 namespace QuotaRings {
     static class Program {

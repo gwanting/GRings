@@ -10,8 +10,10 @@ using System.Windows.Forms;
 using QuotaTray;
 
 [assembly: System.Reflection.AssemblyTitle("Antigravity 用量圆环")]
-[assembly: System.Reflection.AssemblyDescription("反重力任务栏双环监控")]
-[assembly: System.Reflection.AssemblyProduct("Antigravity 任务栏双环")]
+[assembly: System.Reflection.AssemblyDescription("圆环设计与制作：Wanting")]
+[assembly: System.Reflection.AssemblyCompany("Wanting")]
+[assembly: System.Reflection.AssemblyProduct("GRings")]
+[assembly: System.Reflection.AssemblyCopyright("Copyright © 2026 Wanting")]
 
 namespace AntigravityQuotaBar {
     static class Program {

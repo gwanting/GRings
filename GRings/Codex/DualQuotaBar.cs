@@ -69,7 +69,7 @@ class Bar:Form {
  Snapshot Read(){
   try{var direct=ReadAppServer();if(direct!=null)return direct;}catch{}
   var path=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"backend","CodexMeter.exe");
-  if(!File.Exists(path))path=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"ChatGPT","程序安装","DualQuotaBar","build","backend","CodexMeter.exe");
+  if(!File.Exists(path))path=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Programs","CodexMeter","CodexMeter.exe");
   var output=Path.Combine(Path.GetTempPath(),"dual-quota-"+Guid.NewGuid().ToString("N")+".json");try{using(var p=new Process()){p.StartInfo=new ProcessStartInfo(path,"--check \""+output+"\""){UseShellExecute=false,CreateNoWindow=true};p.Start();if(!p.WaitForExit(45000)){try{p.Kill();}catch{}throw new Exception("额度读取超时，显示上次结果");}if(p.ExitCode!=0||!File.Exists(output))throw new Exception("刷新失败，显示上次结果"+(File.Exists(output)?": "+File.ReadAllText(output):" (no output; exit "+p.ExitCode+")"));return Snapshot.Parse(File.ReadAllText(output));}}finally{try{File.Delete(output);}catch{}}
  }
  static string FindCodexExe(){
