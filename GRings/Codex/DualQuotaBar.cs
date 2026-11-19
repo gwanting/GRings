@@ -75,6 +75,7 @@ class Bar:Form {
   var alias=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Microsoft","WindowsApps","codex.exe");
   if(File.Exists(alias))return alias;
   foreach(var proc in Process.GetProcessesByName("codex")){try{var file=proc.MainModule!=null?proc.MainModule.FileName:null;if(!String.IsNullOrEmpty(file)&&File.Exists(file))return file;}catch{}finally{proc.Dispose();}}
+  try{using(var pkgs=Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages")){if(pkgs!=null){foreach(var name in pkgs.GetSubKeyNames()){if(!name.StartsWith("OpenAI.Codex",StringComparison.OrdinalIgnoreCase))continue;using(var sub=pkgs.OpenSubKey(name)){var root=sub!=null?sub.GetValue("PackageRootFolder") as string:null;if(String.IsNullOrEmpty(root))continue;var exe=Path.Combine(root,"app","resources","codex.exe");if(File.Exists(exe))return exe;}}}}}catch{}
   return null;
  }
  static Snapshot ReadAppServer(){
