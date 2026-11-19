@@ -7,7 +7,7 @@
 
 Windows 桌面用量工具：三个透明任务栏圆环（**Codex**、**DeepSeek**、**Antigravity**）、单文件三环整合程序 **`GRings.exe`**，以及配套的 Win-CodexBar。
 
-当前发布版本：**[v0.3.3](https://github.com/gwanting/GRings/releases/tag/v0.3.3)**。从 [Releases](https://github.com/gwanting/GRings/releases) 下载便携包。
+当前发布版本：**[v0.4.0](https://github.com/gwanting/GRings/releases/tag/v0.4.0)**。从 [Releases](https://github.com/gwanting/GRings/releases) 下载 `GRings.exe`。
 
 ## 功能
 
