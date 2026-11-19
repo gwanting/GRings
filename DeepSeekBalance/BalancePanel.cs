@@ -18,21 +18,25 @@ sealed class BalancePanel:Form {
  readonly PanelAppearance appearance=PanelAppearance.Load();
  Panel appearanceView;ComboBox theme;TransparencySlider transparency;Label transparencyText,savedText;bool syncing;
  PanelMotion motion;
+ Bitmap cachedMotionFrame;string lastMotionKey;
  PanelBackdrop backdrop;bool suppressBackdrop;
+ void InvalidateMotionCache(){if(cachedMotionFrame!=null){cachedMotionFrame.Dispose();cachedMotionFrame=null;}}
  public bool IsOpen{get{return motion==null?Visible:motion.TargetVisible;}}
  public bool IsPanelShown{get{return Visible||(motion!=null&&motion.Running);}}
+ public void HideImmediately(){if(motion!=null){motion.Dispose();motion=null;}Hide();}
  public void ShowAnimated(Point anchor){try{if(motion==null)motion=new PanelMotion(this,CaptureMotionFrame,SyncBackdrop);motion.Show(anchor);}catch{if(motion!=null)motion.Dispose();motion=null;Opacity=1;ApplyAppearance();Show();}}
  public void HideAnimated(Point anchor){try{if(motion==null){Hide();return;}motion.Hide(anchor);}catch{if(motion!=null)motion.Dispose();motion=null;Hide();}}
  Bitmap CaptureMotionFrame(){
+  if(cachedMotionFrame!=null)return (Bitmap)cachedMotionFrame.Clone();
   bool wasVisible=Visible;double originalOpacity=Opacity;Bitmap raw=null;
   suppressBackdrop=true;try{if(!wasVisible){Opacity=0;Show();}raw=new Bitmap(Width,Height,System.Drawing.Imaging.PixelFormat.Format24bppRgb);DrawToBitmap(raw,new Rectangle(0,0,Width,Height));}finally{if(!wasVisible)Hide();Opacity=originalOpacity;suppressBackdrop=false;SyncBackdrop();}
   try{raw.MakeTransparent(Color.Black);var frame=new Bitmap(Width,Height,System.Drawing.Imaging.PixelFormat.Format32bppPArgb);using(var graphics=Graphics.FromImage(frame)){
    graphics.Clear(Color.Transparent);graphics.SmoothingMode=SmoothingMode.AntiAlias;
    if(appearance.Transparency<100){int alpha=appearance.BackgroundAlpha;Color tint=appearance.Light?Color.FromArgb(alpha,245,248,252):Color.FromArgb(alpha,24,32,45);using(var shape=new GraphicsPath()){shape.AddArc(0,0,28,28,180,90);shape.AddArc(Width-28,0,28,28,270,90);shape.AddArc(Width-28,Height-28,28,28,0,90);shape.AddArc(0,Height-28,28,28,90,90);shape.CloseFigure();using(var fill=new SolidBrush(tint))graphics.FillPath(fill,shape);}}
    graphics.DrawImageUnscaled(raw,0,0);
-  }return frame;}finally{raw.Dispose();}
+  }cachedMotionFrame=(Bitmap)frame.Clone();return frame;}finally{raw.Dispose();}
  }
- protected override void Dispose(bool disposing){if(disposing){if(motion!=null){motion.Dispose();motion=null;}if(backdrop!=null){backdrop.Dispose();backdrop=null;}}base.Dispose(disposing);}
+ protected override void Dispose(bool disposing){if(disposing){InvalidateMotionCache();if(motion!=null){motion.Dispose();motion=null;}if(backdrop!=null){backdrop.Dispose();backdrop=null;}}base.Dispose(disposing);}
  protected override void OnVisibleChanged(EventArgs e){base.OnVisibleChanged(e);SyncBackdrop();}
  protected override void OnLocationChanged(EventArgs e){base.OnLocationChanged(e);SyncBackdrop();}
  protected override void OnSizeChanged(EventArgs e){base.OnSizeChanged(e);SyncBackdrop();}
@@ -40,7 +44,6 @@ sealed class BalancePanel:Form {
  void ForwardBackdropInput(Point screen){Control hit=this;while(true){var next=hit.GetChildAtPoint(hit.PointToClient(screen),GetChildAtPointSkip.Invisible);if(next==null)break;hit=next;}if(!(hit is TransparencySlider))return;var point=hit.PointToClient(screen);SendMessage(hit.Handle,0x201,new IntPtr(1),new IntPtr((point.X&65535)|((point.Y&65535)<<16)));}
  protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);ApplyAppearance();}
  void ApplyAppearance(){
-  // Keep the foreground opaque; fade the complete material in a separate window.
   TransparencyKey=Color.Black;
   if(IsHandleCreated)try{int dark=appearance.Light?0:1,rounded=2,border=unchecked((int)0xFFFFFFFE);DwmSetWindowAttribute(Handle,20,ref dark,4);DwmSetWindowAttribute(Handle,33,ref rounded,4);DwmSetWindowAttribute(Handle,34,ref border,4);var margins=new GlassMargins();var accent=new AccentPolicy();int size=Marshal.SizeOf(accent);IntPtr memory=Marshal.AllocHGlobal(size);try{Marshal.StructureToPtr(accent,memory,false);var data=new CompositionData{Attribute=19,Data=memory,Size=size};SetWindowCompositionAttribute(Handle,ref data);}finally{Marshal.FreeHGlobal(memory);}DwmExtendFrameIntoClientArea(Handle,ref margins);}catch{}
   if(backdrop==null&&!Disposing&&!IsDisposed){backdrop=new PanelBackdrop();backdrop.BackgroundMouseDown+=ForwardBackdropInput;}
@@ -48,6 +51,7 @@ sealed class BalancePanel:Form {
   glass=backdrop!=null&&backdrop.AcrylicEnabled;BackColor=Color.Black;ForeColor=appearance.Light?Color.FromArgb(24,35,49):Color.White;StyleChildren(this);SyncBackdrop();
   top.ForeColor=appearance.Light?Color.FromArgb(0,92,136):Color.FromArgb(88,205,255);grant.ForeColor=appearance.Light?Color.FromArgb(100,64,171):Color.FromArgb(178,157,255);state.ForeColor=usageState.ForeColor=appearance.Light?Color.FromArgb(69,83,103):Color.FromArgb(178,191,207);
   if(transparency!=null){transparency.TrackColor=appearance.Light?Color.FromArgb(136,152,171):Color.FromArgb(105,122,143);transparency.Invalidate();transparencyText.Text="背景透明度  "+appearance.Transparency.ToString("0.#")+"%";}
+  InvalidateMotionCache();
   Invalidate(true);
  }
  void StyleChildren(Control root){foreach(Control control in root.Controls){control.ForeColor=ForeColor;var label=control as Label;if(label!=null){label.BackColor=Color.Transparent;label.UseCompatibleTextRendering=glass;}var panel=control as Panel;if(panel!=null)panel.BackColor=Color.Transparent;var button=control as Button;if(button!=null){button.UseVisualStyleBackColor=false;button.BackColor=appearance.Light?Color.FromArgb(231,239,247):Color.FromArgb(32,46,62);button.FlatAppearance.BorderColor=appearance.Light?Color.FromArgb(119,143,165):Color.FromArgb(127,151,175);button.FlatAppearance.MouseOverBackColor=appearance.Light?Color.FromArgb(211,228,241):Color.FromArgb(43,66,88);}var combo=control as ComboBox;if(combo!=null)combo.BackColor=appearance.Light?Color.FromArgb(242,247,251):Color.FromArgb(32,46,62);if(control.HasChildren)StyleChildren(control);}}
@@ -80,6 +84,8 @@ sealed class BalancePanel:Form {
  }
  public void UpdateBalance(BalanceSnapshot value,string error,bool busy,PlatformUsage usage){bool valid=value!=null&&value.Current;total.Text=valid?value.Unit+" "+value.Amount:"—";top.Text="充值余额  "+(valid?value.Unit+" "+value.ToppedUp.ToString("0.00"):"未知");grant.Text="赠金余额  "+(valid?value.Unit+" "+value.Granted.ToString("0.00"):"未知");state.Text=busy?"正在查询官方余额…":error!=null?error+"\n"+(value==null?"":"上次成功 "+value.Fetched.LocalDateTime.ToString("HH:mm:ss")):value==null?"正在读取…":"余额更新 "+value.Fetched.LocalDateTime.ToString("HH:mm:ss");refresh.Enabled=!busy;
   bool known=usage!=null&&usage.Current;string unit=known?(usage.Currency=="CNY"?"¥":usage.Currency=="USD"?"$":usage.Currency+" "):"";todayCost.Text="今日消费  "+(known?unit+usage.Cost.ToString("0.00"):"—");todayTokens.Text="今日 Token  "+(known?usage.TokenText:"—");usageState.Text=known?"官方账户全量 · 北京时间 · "+usage.Fetched.ToOffset(TimeSpan.FromHours(8)).ToString("HH:mm"):usage==null?"点击“登录用量”接入账户统计":usage.Error??"用量已过期，正在刷新";
+  string key=total.Text+"|"+top.Text+"|"+grant.Text+"|"+state.Text+"|"+todayCost.Text+"|"+todayTokens.Text+"|"+usageState.Text;
+  if(key!=lastMotionKey){lastMotionKey=key;InvalidateMotionCache();}
  }
 }
 }

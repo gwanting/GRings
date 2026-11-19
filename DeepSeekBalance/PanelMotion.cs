@@ -24,10 +24,12 @@ sealed class PanelMotion:IDisposable {
  int generation;
  double duration;
  byte startAlpha;
+ public int LastFrameCount{get;private set;}
+ public double LastFps{get;private set;}
  public bool Running{get{return running;}}
  public bool TargetVisible{get{return running?opening:owner.Visible;}}
  public PanelMotion(Form form,Func<Bitmap> snapshot,Action refresh){owner=form;capture=snapshot;restore=refresh;}
- static Rectangle Small(Rectangle full,Point center){int w=Math.Max(1,(int)Math.Round(full.Width*0.20)),h=Math.Max(1,(int)Math.Round(full.Height*0.20));return new Rectangle(center.X-w/2,center.Y-h/2,w,h);}
+ static Rectangle Small(Rectangle full,Point center){int w=Math.Max(1,(int)Math.Round(full.Width*0.22)),h=Math.Max(1,(int)Math.Round(full.Height*0.22));return new Rectangle(center.X-w/2,center.Y-h/2,w,h);}
  void EnableHighRes(bool enable){if(enable==highResTimer)return;highResTimer=enable;try{if(enable)timeBeginPeriod(1);else timeEndPeriod(1);}catch{}}
  public void Show(Point origin){
   if(disposed)return;if(running&&opening)return;if(owner.Visible&&!running)return;
@@ -48,58 +50,63 @@ sealed class PanelMotion:IDisposable {
  }
  void Start(Rectangle start,Rectangle end,bool show){
   from=start;to=end;currentBounds=start;opening=show;
-  startAlpha=surface.HasFrame?surface.CurrentAlpha:show?(byte)30:(byte)255;
-  duration=show?200:160;
+  startAlpha=surface.HasFrame?surface.CurrentAlpha:show?(byte)35:(byte)255;
+  duration=show?220:170;
   running=true;
   int myGen=++generation;
   EnableHighRes(true);
   clock.Restart();
   surface.Render(from,startAlpha);
   if(!surface.Visible)surface.Show();
-  var thread=new Thread(()=>RunLoop(myGen)){IsBackground=true,Priority=ThreadPriority.AboveNormal,Name="DeepSeek VSync Motion"};
+  IntPtr surfHandle=surface.Handle;
+  var localSurface=surface;
+  var thread=new Thread(()=>RunLoop(myGen,localSurface,surfHandle,from,to,opening,startAlpha,duration)){IsBackground=true,Priority=ThreadPriority.AboveNormal,Name="DeepSeek VSync Motion"};
   thread.Start();
  }
- void RunLoop(int myGen){
-  long lastTicks=0;
-  double minFrameMs=1000.0/120.0;
+ void RunLoop(int myGen,MotionSurface localSurface,IntPtr surfHandle,Rectangle startRect,Rectangle endRect,bool isOpening,byte alphaStart,double animDuration){
+  int frames=1;
   while(running&&!disposed&&generation==myGen){
    try{
-    if(DwmFlush()!=0)Thread.Sleep(8);
+    if(DwmFlush()!=0)Thread.Sleep(4);
    }catch{
-    Thread.Sleep(8);
+    Thread.Sleep(4);
    }
    if(!running||disposed||generation!=myGen)break;
-   long nowTicks=clock.ElapsedTicks;
-   double sinceLast=(nowTicks-lastTicks)*1000.0/Stopwatch.Frequency;
-   if(lastTicks!=0&&sinceLast<minFrameMs)continue;
-   lastTicks=nowTicks;
-   try{
-    var s=surface;
-    if(s==null||s.IsDisposed||!s.IsHandleCreated)break;
-    s.Invoke(new Action(()=>Step(myGen)));
-   }catch{break;}
+   double elapsed=clock.Elapsed.TotalMilliseconds;
+   double fraction=Math.Min(1.0,elapsed/animDuration);
+   double ease=isOpening?1.0-Math.Pow(1.0-fraction,3):1.0-Math.Pow(1.0-fraction,2);
+   var rect=new Rectangle(Mix(startRect.X,endRect.X,ease),Mix(startRect.Y,endRect.Y,ease),Math.Max(1,Mix(startRect.Width,endRect.Width,ease)),Math.Max(1,Mix(startRect.Height,endRect.Height,ease)));
+   byte alpha=(byte)Math.Max(0,Math.Min(255,alphaStart+((isOpening?255:0)-alphaStart)*ease));
+   currentBounds=rect;
+   if(!localSurface.RenderOnHandle(surfHandle,rect,alpha))break;
+   frames++;
+   if(fraction>=1.0){
+    LastFrameCount=frames;
+    LastFps=elapsed>0?frames*1000.0/elapsed:0;
+    try{
+     if(!owner.IsDisposed&&owner.IsHandleCreated)owner.BeginInvoke(new Action(()=>Finish(myGen,isOpening)));
+    }catch{}
+    return;
+   }
   }
  }
- void Step(int myGen){
-  if(disposed||!running||generation!=myGen||owner.IsDisposed||surface==null){running=false;EnableHighRes(false);return;}
-  double fraction=Math.Min(1.0,clock.Elapsed.TotalMilliseconds/duration);
-  double ease=opening?1.0-Math.Pow(1.0-fraction,3):1.0-Math.Pow(1.0-fraction,2);
-  currentBounds=new Rectangle(Mix(from.X,to.X,ease),Mix(from.Y,to.Y,ease),Math.Max(1,Mix(from.Width,to.Width,ease)),Math.Max(1,Mix(from.Height,to.Height,ease)));
-  surface.Render(currentBounds,(byte)Math.Max(0,Math.Min(255,startAlpha+((opening?255:0)-startAlpha)*ease)));
-  if(fraction<1.0)return;
+ void Finish(int myGen,bool isOpening){
+  if(disposed||generation!=myGen)return;
   running=false;clock.Stop();EnableHighRes(false);
-  if(opening){owner.Bounds=fullBounds;restore();owner.Show();owner.Update();}
-  surface.Dispose();surface=null;
+  if(isOpening&&!owner.IsDisposed){owner.Bounds=fullBounds;restore();owner.Show();owner.Update();}
+  if(surface!=null){surface.Dispose();surface=null;}
  }
  static int Mix(int a,int b,double amount){return (int)Math.Round(a+(b-a)*amount);}
  public void Dispose(){if(disposed)return;disposed=true;running=false;generation++;EnableHighRes(false);if(surface!=null){surface.Dispose();surface=null;}}
 }
 
 sealed class MotionSurface:Form {
+ readonly object renderLock=new object();
  readonly Bitmap snapshot,canvas;
  readonly Graphics canvasGraphics;
  readonly Rectangle surfaceBounds;
  IntPtr screenDc,memoryDc,dibHandle,oldBitmap;
+ bool disposedSurface;
  public bool HasFrame{get;private set;}
  public byte CurrentAlpha{get;private set;}
  [StructLayout(LayoutKind.Sequential)]struct NativePoint{public int X,Y;public NativePoint(int x,int y){X=x;Y=y;}}
@@ -136,28 +143,38 @@ sealed class MotionSurface:Form {
   Bounds=unionBounds;
  }
  public void Render(Rectangle bounds,byte alpha){
-  HasFrame=true;CurrentAlpha=alpha;
-  canvasGraphics.Clear(Color.Transparent);
-  var dest=new Rectangle(bounds.X-surfaceBounds.X,bounds.Y-surfaceBounds.Y,bounds.Width,bounds.Height);
-  canvasGraphics.DrawImage(snapshot,dest,0,0,snapshot.Width,snapshot.Height,GraphicsUnit.Pixel);
-  var destination=new NativePoint(surfaceBounds.X,surfaceBounds.Y);
-  var origin=new NativePoint(0,0);
-  var size=new NativeSize(surfaceBounds.Width,surfaceBounds.Height);
-  var blend=new Blend{Alpha=alpha,Format=1};
-  UpdateLayeredWindow(Handle,screenDc,ref destination,ref size,memoryDc,ref origin,0,ref blend,2);
+  RenderOnHandle(Handle,bounds,alpha);
+ }
+ public bool RenderOnHandle(IntPtr hwnd,Rectangle bounds,byte alpha){
+  lock(renderLock){
+   if(disposedSurface||hwnd==IntPtr.Zero||memoryDc==IntPtr.Zero)return false;
+   HasFrame=true;CurrentAlpha=alpha;
+   canvasGraphics.Clear(Color.Transparent);
+   var dest=new Rectangle(bounds.X-surfaceBounds.X,bounds.Y-surfaceBounds.Y,bounds.Width,bounds.Height);
+   canvasGraphics.DrawImage(snapshot,dest,0,0,snapshot.Width,snapshot.Height,GraphicsUnit.Pixel);
+   var destination=new NativePoint(surfaceBounds.X,surfaceBounds.Y);
+   var origin=new NativePoint(0,0);
+   var size=new NativeSize(surfaceBounds.Width,surfaceBounds.Height);
+   var blend=new Blend{Alpha=alpha,Format=1};
+   return UpdateLayeredWindow(hwnd,screenDc,ref destination,ref size,memoryDc,ref origin,0,ref blend,2);
+  }
  }
  protected override void Dispose(bool disposing){
-  if(disposing){
-   canvasGraphics.Dispose();
-   canvas.Dispose();
-   snapshot.Dispose();
+  lock(renderLock){
+   if(disposedSurface)return;
+   disposedSurface=true;
+   if(disposing){
+    canvasGraphics.Dispose();
+    canvas.Dispose();
+    snapshot.Dispose();
+   }
+   if(memoryDc!=IntPtr.Zero){
+    if(oldBitmap!=IntPtr.Zero){SelectObject(memoryDc,oldBitmap);oldBitmap=IntPtr.Zero;}
+    DeleteDC(memoryDc);memoryDc=IntPtr.Zero;
+   }
+   if(dibHandle!=IntPtr.Zero){DeleteObject(dibHandle);dibHandle=IntPtr.Zero;}
+   if(screenDc!=IntPtr.Zero){ReleaseDC(IntPtr.Zero,screenDc);screenDc=IntPtr.Zero;}
   }
-  if(memoryDc!=IntPtr.Zero){
-   if(oldBitmap!=IntPtr.Zero){SelectObject(memoryDc,oldBitmap);oldBitmap=IntPtr.Zero;}
-   DeleteDC(memoryDc);memoryDc=IntPtr.Zero;
-  }
-  if(dibHandle!=IntPtr.Zero){DeleteObject(dibHandle);dibHandle=IntPtr.Zero;}
-  if(screenDc!=IntPtr.Zero){ReleaseDC(IntPtr.Zero,screenDc);screenDc=IntPtr.Zero;}
   base.Dispose(disposing);
  }
 }
