@@ -1,13 +1,13 @@
-﻿# Codex + DeepSeek 任务栏双环
+﻿# GRings — Windows 任务栏 AI 额度三环
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platform: Windows x64](https://img.shields.io/badge/Platform-Windows%20x64-0078D6.svg)](https://github.com/gwanting/codex-deepseek-quota-rings/releases)
+[![Platform: Windows x64](https://img.shields.io/badge/Platform-Windows%20x64-0078D6.svg)](https://github.com/gwanting/GRings/releases)
 
 > **圆环设计与制作：Wanting。** 作者：[Wanting / @gwanting](https://github.com/gwanting)
 
-Windows 桌面用量工具：两个透明任务栏圆环、一个统一启动入口，以及配套的 Win-CodexBar。
+Windows 桌面用量工具：三个透明任务栏圆环（**Codex**、**DeepSeek**、**Antigravity**）、单文件三环整合程序 **`GRings.exe`**，以及配套的 Win-CodexBar。
 
-当前发布版本：**[v0.3.3](https://github.com/gwanting/codex-deepseek-quota-rings/releases/tag/v0.3.3)**。从 [Releases](https://github.com/gwanting/codex-deepseek-quota-rings/releases) 下载便携包。
+当前发布版本：**[v0.3.3](https://github.com/gwanting/GRings/releases/tag/v0.3.3)**。从 [Releases](https://github.com/gwanting/GRings/releases) 下载便携包。
 
 ## 功能
 
@@ -25,7 +25,7 @@ Windows 桌面用量工具：两个透明任务栏圆环、一个统一启动入
   .\GRings\build\GRings.exe
   ```
 
-- 两个圆环均为 60×60 像素，透明背景，位于任务栏通知区左侧。
+- 三个圆环均为 60×60 像素，透明背景，位于任务栏通知区左侧，自动并排停靠并在全屏应用时自动隐藏。
 - 点击圆心、环线或环间空隙均能打开详情；再次点击圆环收起，点击窗口内部可操作，点击外部收起。
 - 一个“Codex 用量”桌面图标启动三个组件，已运行的组件不会重复启动。
 - 右键任一圆环，选择“关于”可查看作者及版权声明；两个圆环和统一启动器的文件属性也包含作者、产品名和版权信息。
@@ -67,12 +67,13 @@ DeepSeek 圆环复用当前 Windows 用户在 Win-CodexBar 中保存的密钥，
 - **Codex**：读取当前 `CODEX_HOME/sessions`（默认 `~/.codex/sessions`）中额度事件的元数据，并以 CodexMeter 的只读接口查询补充。事件通常在数秒内反映；接口约每 30 秒查询一次，失败约每 15 秒重试。不同会话与服务端存在延迟，不能保证与 Codex 每一帧完全一致。数据过期或已重置时显示 `--`，不推算虚构额度。
 - **DeepSeek**：查询官方 `https://api.deepseek.com/user/balance`；约每 60 秒更新，失败每 15 秒重试。过期金额不作为当前读数展示。外环是相对用户设定基准的比例，不是官方请求次数额度。
 - **今日账户用量**：独立 WebView2 窗口在官方平台页面内只读查询 `usage/by_api_key/amount`、`cost`，显式采用北京时间边界。网页内部接口可能变化，官方统计也可能有延迟。未登录、登录失效、跨日或缓存超过 5 分钟时显示未知，不能视为零。详细说明见 [PLATFORM_USAGE.md](DeepSeekBalance/PLATFORM_USAGE.md)。
+- **Antigravity**：通过官方无头只读命令 `agy -p "/usage" --output-format json` 读取 Gemini（5h / 本周）、Claude / GPT 与 Gemini 4 Argon 剩余额度，零 Token 消耗。
 - Windows 系统代理由统一启动器传给子程序；不会为你切换代理节点。
 - Win-CodexBar 的详情由上游独立刷新，和圆环不是同一个界面数据对象。
 
 ## 目录与许可证
 
-`DualQuotaBar/` 为 Codex 圆环与统一启动器；`DeepSeekBalance/` 为余额视图；`third_party/` 保存固定依赖清单及许可证。原版 Win-CodexBar 和 CodexMeter 以校验后的原文件随便携包提供。
+`GRings/` 为三环合一单文件整合版（含多分辨率圆形双环图标）；`DualQuotaBar/` 为 Codex 圆环与统一启动器；`DeepSeekBalance/` 为 DeepSeek 余额视图；`AntigravityQuotaBar/` 为 Antigravity 独立双环；`Shared/` 为共享的全屏隐藏与圆环绘制模块；`third_party/` 保存固定依赖清单及许可证。原版 Win-CodexBar 和 CodexMeter 以校验后的原文件随便携包提供。
 
 本项目代码 MIT，第三方许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。仓库及便携包均不附带个人 API 密钥、账户配置或日志。
 
@@ -82,7 +83,7 @@ DeepSeek 圆环复用当前 Windows 用户在 Win-CodexBar 中保存的密钥，
 
 ## 问题反馈
 
-使用问题和功能建议请提交至 [Issues](https://github.com/gwanting/codex-deepseek-quota-rings/issues)，附上 Windows 版本、程序版本、复现步骤及脱敏截图。请勿上传 API 密钥、登录令牌、验证码、浏览器用户资料目录或未经脱敏的账户文件。
+使用问题和功能建议请提交至 [Issues](https://github.com/gwanting/GRings/issues)，附上 Windows 版本、程序版本、复现步骤及脱敏截图。请勿上传 API 密钥、登录令牌、验证码、浏览器用户资料目录或未经脱敏的账户文件。
 
 ## 版权与许可
 

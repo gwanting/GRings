@@ -33,4 +33,4 @@
 - 接入 DeepSeek 官方账户今日消费与 Token 统计，采用北京时间按日汇总。
 - Token 按数量显示为亿、千万、百万。
 
-更早版本见 [Releases](https://github.com/gwanting/codex-deepseek-quota-rings/releases)。
+更早版本见 [Releases](https://github.com/gwanting/GRings/releases)。

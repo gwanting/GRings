@@ -4,7 +4,7 @@ $ErrorActionPreference='Stop'
 if($Version -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$'){throw 'Version must be vX.Y.Z.'}
 $root=Split-Path -Parent $PSScriptRoot
 $dist=Join-Path $root 'dist'
-$name='codex-deepseek-quota-rings-'+$Version+'-windows-x64'
+$name='GRings-'+$Version+'-windows-x64'
 $package=Join-Path $dist $name
 if(Test-Path -LiteralPath $package){throw 'Package directory exists; use a new version or inspect it first.'}
 $files=@(
