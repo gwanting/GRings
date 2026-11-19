@@ -55,6 +55,7 @@ sealed class BalancePanel:Form {
   }
  }
  public void HideAnimated(Point anchor){try{if(motion==null){Hide();return;}motion.Hide(anchor);}catch{if(motion!=null)motion.Dispose();motion=null;Hide();}}
+ Color KeyColor{get{return appearance.Light?Color.FromArgb(245,248,252):Color.FromArgb(24,32,45);}}
  Bitmap CaptureMotionFrame(){
   if(cachedMotionFrame!=null)return (Bitmap)cachedMotionFrame.Clone();
   bool wasVisible=Visible;Point originalLocation=Location;Bitmap raw=null;
@@ -68,7 +69,7 @@ sealed class BalancePanel:Form {
    suppressBackdrop=false;
    if(wasVisible)SyncBackdrop();
   }
-  try{raw.MakeTransparent(Color.Black);var frame=new Bitmap(Width,Height,System.Drawing.Imaging.PixelFormat.Format32bppPArgb);using(var graphics=Graphics.FromImage(frame)){
+  try{raw.MakeTransparent(KeyColor);var frame=new Bitmap(Width,Height,System.Drawing.Imaging.PixelFormat.Format32bppPArgb);using(var graphics=Graphics.FromImage(frame)){
    graphics.Clear(Color.Transparent);graphics.SmoothingMode=SmoothingMode.AntiAlias;
    if(appearance.Transparency<100){int alpha=appearance.BackgroundAlpha;Color tint=appearance.Light?Color.FromArgb(alpha,245,248,252):Color.FromArgb(alpha,24,32,45);using(var shape=new GraphicsPath()){shape.AddArc(0,0,28,28,180,90);shape.AddArc(Width-28,0,28,28,270,90);shape.AddArc(Width-28,Height-28,28,28,0,90);shape.AddArc(0,Height-28,28,28,90,90);shape.CloseFigure();using(var fill=new SolidBrush(tint))graphics.FillPath(fill,shape);}}
    graphics.DrawImageUnscaled(raw,0,0);
@@ -82,17 +83,18 @@ sealed class BalancePanel:Form {
  void ForwardBackdropInput(Point screen){Control hit=this;while(true){var next=hit.GetChildAtPoint(hit.PointToClient(screen),GetChildAtPointSkip.Invisible);if(next==null)break;hit=next;}if(!(hit is TransparencySlider))return;var point=hit.PointToClient(screen);SendMessage(hit.Handle,0x201,new IntPtr(1),new IntPtr((point.X&65535)|((point.Y&65535)<<16)));}
  protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);ApplyAppearance();}
  void ApplyAppearance(){
-  TransparencyKey=Color.Black;
+  Color key=KeyColor;
+  TransparencyKey=key;
   if(IsHandleCreated)try{int dark=appearance.Light?0:1,noRound=1,border=unchecked((int)0xFFFFFFFE);DwmSetWindowAttribute(Handle,20,ref dark,4);DwmSetWindowAttribute(Handle,33,ref noRound,4);DwmSetWindowAttribute(Handle,34,ref border,4);var margins=new GlassMargins();var accent=new AccentPolicy();int size=Marshal.SizeOf(accent);IntPtr memory=Marshal.AllocHGlobal(size);try{Marshal.StructureToPtr(accent,memory,false);var data=new CompositionData{Attribute=19,Data=memory,Size=size};SetWindowCompositionAttribute(Handle,ref data);}finally{Marshal.FreeHGlobal(memory);}DwmExtendFrameIntoClientArea(Handle,ref margins);}catch{}
   if(backdrop==null&&!Disposing&&!IsDisposed){backdrop=new PanelBackdrop();backdrop.BackgroundMouseDown+=ForwardBackdropInput;}
   if(backdrop!=null&&!backdrop.IsDisposed&&IsHandleCreated)backdrop.Configure(appearance.Light,appearance.Tint,appearance.BackgroundAlpha,Bounds);
-  glass=backdrop!=null&&backdrop.AcrylicEnabled;BackColor=Color.Black;ForeColor=appearance.Light?Color.FromArgb(24,35,49):Color.White;StyleChildren(this);SyncBackdrop();
-  top.ForeColor=appearance.Light?Color.FromArgb(0,92,136):Color.FromArgb(88,205,255);grant.ForeColor=appearance.Light?Color.FromArgb(100,64,171):Color.FromArgb(178,157,255);state.ForeColor=usageState.ForeColor=appearance.Light?Color.FromArgb(69,83,103):Color.FromArgb(178,191,207);
+  glass=backdrop!=null&&backdrop.AcrylicEnabled;BackColor=key;ForeColor=appearance.Light?Color.FromArgb(24,35,49):Color.White;StyleChildren(this);SyncBackdrop();
+  top.ForeColor=appearance.Light?Color.FromArgb(0,92,136):Color.FromArgb(88,205,255);grant.ForeColor=appearance.Light?Color.FromArgb(100,64,171):Color.FromArgb(178,157,255);state.ForeColor=usageState.ForeColor=appearance.Light?Color.FromArgb(69,83,103):Color.FromArgb(196,208,222);
   if(transparency!=null){transparency.TrackColor=appearance.Light?Color.FromArgb(136,152,171):Color.FromArgb(105,122,143);transparency.Invalidate();transparencyText.Text="背景透明度  "+appearance.Transparency.ToString("0.#")+"%";}
   InvalidateMotionCache();
   Invalidate(true);
  }
- void StyleChildren(Control root){foreach(Control control in root.Controls){control.ForeColor=ForeColor;var label=control as Label;if(label!=null){label.BackColor=Color.Transparent;label.UseCompatibleTextRendering=glass;}var panel=control as Panel;if(panel!=null)panel.BackColor=Color.Transparent;var button=control as Button;if(button!=null){button.UseVisualStyleBackColor=false;button.BackColor=appearance.Light?Color.FromArgb(231,239,247):Color.FromArgb(32,46,62);button.FlatAppearance.BorderColor=appearance.Light?Color.FromArgb(119,143,165):Color.FromArgb(127,151,175);button.FlatAppearance.MouseOverBackColor=appearance.Light?Color.FromArgb(211,228,241):Color.FromArgb(43,66,88);}var combo=control as ComboBox;if(combo!=null)combo.BackColor=appearance.Light?Color.FromArgb(242,247,251):Color.FromArgb(32,46,62);if(control.HasChildren)StyleChildren(control);}}
+ void StyleChildren(Control root){Color key=KeyColor;foreach(Control control in root.Controls){control.ForeColor=ForeColor;var label=control as Label;if(label!=null){label.BackColor=key;label.UseCompatibleTextRendering=false;}var panel=control as Panel;if(panel!=null)panel.BackColor=key;var button=control as Button;if(button!=null){button.UseVisualStyleBackColor=false;button.BackColor=appearance.Light?Color.FromArgb(231,239,247):Color.FromArgb(32,46,62);button.FlatAppearance.BorderColor=appearance.Light?Color.FromArgb(119,143,165):Color.FromArgb(127,151,175);button.FlatAppearance.MouseOverBackColor=appearance.Light?Color.FromArgb(211,228,241):Color.FromArgb(43,66,88);}var combo=control as ComboBox;if(combo!=null)combo.BackColor=appearance.Light?Color.FromArgb(242,247,251):Color.FromArgb(32,46,62);if(control.HasChildren)StyleChildren(control);}}
  void SaveAppearance(){appearance.Save();if(savedText!=null){savedText.Text=appearance.SaveError??"已自动保存";savedText.ForeColor=appearance.SaveError==null?ForeColor:Color.FromArgb(230,95,95);}}
  void PreviewTransparency(){appearance.Transparency=transparency.Value;transparencyText.Text="背景透明度  "+appearance.Transparency.ToString("0.#")+"%";if(backdrop==null){ApplyAppearance();return;}backdrop.PreviewOpacity(appearance.BackgroundAlpha);if(Visible)backdrop.PlaceBehind(Handle);}
  void CommitTransparency(){ApplyAppearance();SaveAppearance();}
@@ -114,7 +116,7 @@ sealed class BalancePanel:Form {
   total.Bounds=new Rectangle(22,64,326,54);total.Font=new Font("Segoe UI",36,FontStyle.Bold,GraphicsUnit.Pixel);Controls.Add(total);
   top.Bounds=new Rectangle(24,130,320,30);top.ForeColor=Color.FromArgb(88,205,255);Controls.Add(top);grant.Bounds=new Rectangle(24,166,320,30);grant.ForeColor=Color.FromArgb(178,157,255);Controls.Add(grant);
   todayCost.Bounds=new Rectangle(24,205,320,30);Controls.Add(todayCost);todayTokens.Bounds=new Rectangle(24,239,320,30);Controls.Add(todayTokens);
-  usageState.Bounds=new Rectangle(24,274,320,24);usageState.Font=new Font("Microsoft YaHei UI",13,FontStyle.Regular,GraphicsUnit.Pixel);usageState.ForeColor=Color.FromArgb(178,191,207);Controls.Add(usageState);
+  usageState.Bounds=new Rectangle(24,274,320,24);usageState.Font=new Font("Microsoft YaHei UI",14,FontStyle.Regular,GraphicsUnit.Pixel);usageState.ForeColor=Color.FromArgb(196,208,222);Controls.Add(usageState);
   state.Bounds=new Rectangle(24,303,320,38);state.Font=new Font("Microsoft YaHei UI",14,FontStyle.Regular,GraphicsUnit.Pixel);state.ForeColor=Color.FromArgb(178,191,207);Controls.Add(state);
   refresh.Font=new Font("Microsoft YaHei UI",16,FontStyle.Regular,GraphicsUnit.Pixel);refresh.Text="刷新";refresh.Bounds=new Rectangle(248,346,96,32);refresh.FlatStyle=FlatStyle.Flat;refresh.ForeColor=Color.White;refresh.Click+=(s,e)=>fetch();Controls.Add(refresh);
   var signIn=new Button{Text="登录用量",Bounds=new Rectangle(136,346,96,32),FlatStyle=FlatStyle.Flat,Font=new Font("Microsoft YaHei UI",16,FontStyle.Regular,GraphicsUnit.Pixel)};signIn.Click+=(s,e)=>login();Controls.Add(signIn);

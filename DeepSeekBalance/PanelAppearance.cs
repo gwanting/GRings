@@ -9,7 +9,11 @@ using System.Windows.Forms;
 
 namespace DeepSeekBalance {
 sealed class FrostedLabel:Label {
- protected override void OnPaint(PaintEventArgs e){e.Graphics.CompositingMode=CompositingMode.SourceCopy;e.Graphics.TextRenderingHint=System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;using(var brush=new SolidBrush(ForeColor))using(var format=new StringFormat()){format.Alignment=TextAlign==ContentAlignment.TopRight?StringAlignment.Far:StringAlignment.Near;e.Graphics.DrawString(Text,Font,brush,new RectangleF(0,0,Width,Height),format);}}
+ protected override void OnPaint(PaintEventArgs e){
+  var flags=TextFormatFlags.NoPrefix|TextFormatFlags.WordBreak|TextFormatFlags.TextBoxControl;
+  if(TextAlign==ContentAlignment.TopRight||TextAlign==ContentAlignment.MiddleRight)flags|=TextFormatFlags.Right;
+  TextRenderer.DrawText(e.Graphics,Text,Font,ClientRectangle,ForeColor,BackColor,flags);
+ }
 }
 sealed class PanelAppearance {
  public bool Light;
