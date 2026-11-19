@@ -28,7 +28,7 @@ namespace AntigravityQuotaBar {
     sealed class Bar : Form {
         Color outerColor = Color.FromArgb(249, 136, 179); // Warm Pink (#F988B3)
         Color innerColor = Color.FromArgb(226, 210, 174); // Light Khaki (#E2D2AE)
-        static readonly string ThemeFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "theme.txt");
+        static readonly string ThemeFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GRings", "theme.txt");
 
         readonly RingClicks ringClicks;
         AntigravityCard card;
@@ -117,7 +117,7 @@ namespace AntigravityQuotaBar {
             menu.Items.Add("打开 agy 登录终端", null, (s, e) => LaunchLoginAgy());
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("关于", null, (s, e) => MessageBox.Show(this,
-                "Antigravity 用量圆环\n\n圆环设计与制作：Wanting\nCopyright © 2026 Wanting\n\nMIT License\n\nhttps://github.com/gwanting/GRings",
+                "Antigravity 用量圆环\n\n外环：Gemini 5 小时剩余额度\n内环：Gemini 本周剩余额度\n数据源：官方 agy CLI (/usage)\n\n单击展开卡片，双击切换黑白数字，右键可切换配色。",
                 "关于 Antigravity 用量圆环", MessageBoxButtons.OK, MessageBoxIcon.Information));
             menu.Items.Add("关闭此圆环", null, (s, e) => Close());
             menu.Items.Add("退出全部三环", null, (s, e) => QuotaRings.Program.ExitAll());
@@ -404,6 +404,7 @@ namespace AntigravityQuotaBar {
             outerColor = outer;
             innerColor = inner;
             try {
+                Directory.CreateDirectory(Path.GetDirectoryName(ThemeFile));
                 File.WriteAllText(ThemeFile, ColorTranslator.ToHtml(outer) + "," + ColorTranslator.ToHtml(inner));
             } catch { }
             if (card != null) card.SetColors(outer, inner);

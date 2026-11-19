@@ -24,19 +24,54 @@ sealed class BalanceSnapshot {
  static decimal Money(Dictionary<string,object> item,string key){decimal value;if(!decimal.TryParse(Convert.ToString(item[key],CultureInfo.InvariantCulture),NumberStyles.Number,CultureInfo.InvariantCulture,out value)||value<0)throw new InvalidDataException("余额金额格式无效");return value;}
 }
 static class DeepSeekClient {
+ public static string DataFolder{get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"GRings");}}
+ public static string KeyPath{get{return Path.Combine(DataFolder,"deepseek-key.dat");}}
  public static Dictionary<string,object> Json(string text){return new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(text);}
- public static BalanceSnapshot Read(){
-  var path=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),"CodexBar","api_keys.json");
-  if(!File.Exists(path))throw new InvalidOperationException("未找到 Win-CodexBar 已保存的 API 密钥");
-  var document=Json(File.ReadAllText(path));object raw;
-  if(document.TryGetValue("format",out raw)&&Convert.ToString(raw)=="codexbar.secure-file"){
-   if(Convert.ToString(document["protection"])!="windows-dpapi-user")throw new InvalidOperationException("不支持的密钥存储格式");
-   var plain=ProtectedData.Unprotect(Convert.FromBase64String(Convert.ToString(document["payload"])),null,DataProtectionScope.CurrentUser);try{document=Json(Encoding.UTF8.GetString(plain));}finally{Array.Clear(plain,0,plain.Length);}
+ public static void SaveApiKey(string apiKey){
+  if(String.IsNullOrWhiteSpace(apiKey))throw new ArgumentException("API 密钥不能为空");
+  Directory.CreateDirectory(DataFolder);
+  var bytes=Encoding.UTF8.GetBytes(apiKey.Trim());
+  try{
+   var encrypted=ProtectedData.Protect(bytes,null,DataProtectionScope.CurrentUser);
+   File.WriteAllBytes(KeyPath,encrypted);
+  }finally{Array.Clear(bytes,0,bytes.Length);}
+ }
+ public static string LoadApiKey(){
+  if(File.Exists(KeyPath)){
+   var plain=ProtectedData.Unprotect(File.ReadAllBytes(KeyPath),null,DataProtectionScope.CurrentUser);
+   try{
+    string saved=Encoding.UTF8.GetString(plain).Trim();
+    if(!String.IsNullOrWhiteSpace(saved))return saved;
+   }finally{Array.Clear(plain,0,plain.Length);}
   }
-  var keys=document["keys"] as Dictionary<string,object>;if(keys==null||!keys.TryGetValue("deepseek",out raw))throw new InvalidOperationException("请先在 Win-CodexBar 中保存 DeepSeek API 密钥");
-  var entry=raw as Dictionary<string,object>;string key=entry==null?null:Convert.ToString(entry["api_key"]);if(String.IsNullOrWhiteSpace(key))throw new InvalidOperationException("DeepSeek API 密钥为空");
+  string migrated=TryMigrateFromCodexBar();
+  if(!String.IsNullOrWhiteSpace(migrated)){
+   try{SaveApiKey(migrated);}catch{}
+   return migrated;
+  }
+  return null;
+ }
+ static string TryMigrateFromCodexBar(){
+  try{
+   var path=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),"CodexBar","api_keys.json");
+   if(!File.Exists(path))return null;
+   var document=Json(File.ReadAllText(path));object raw;
+   if(document.TryGetValue("format",out raw)&&Convert.ToString(raw)=="codexbar.secure-file"){
+    if(Convert.ToString(document["protection"])!="windows-dpapi-user")return null;
+    var plain=ProtectedData.Unprotect(Convert.FromBase64String(Convert.ToString(document["payload"])),null,DataProtectionScope.CurrentUser);
+    try{document=Json(Encoding.UTF8.GetString(plain));}finally{Array.Clear(plain,0,plain.Length);}
+   }
+   var keys=document["keys"] as Dictionary<string,object>;
+   if(keys==null||!keys.TryGetValue("deepseek",out raw))return null;
+   var entry=raw as Dictionary<string,object>;
+   return entry==null?null:Convert.ToString(entry["api_key"]);
+  }catch{return null;}
+ }
+ public static BalanceSnapshot Read(){
+  string key=LoadApiKey();
+  if(String.IsNullOrWhiteSpace(key))throw new InvalidOperationException("请右键圆环点击「设置 DeepSeek API 密钥…」");
   ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
-  var request=(HttpWebRequest)WebRequest.Create("https://api.deepseek.com/user/balance");request.Method="GET";request.AllowAutoRedirect=false;request.Timeout=15000;request.ReadWriteTimeout=15000;request.Proxy=WebRequest.GetSystemWebProxy();request.Headers[HttpRequestHeader.Authorization]="Bearer "+key;request.UserAgent="DeepSeekBalance/1.0";
+  var request=(HttpWebRequest)WebRequest.Create("https://api.deepseek.com/user/balance");request.Method="GET";request.AllowAutoRedirect=false;request.Timeout=15000;request.ReadWriteTimeout=15000;request.Proxy=WebRequest.GetSystemWebProxy();request.Headers[HttpRequestHeader.Authorization]="Bearer "+key;request.UserAgent="GRings/1.0";
   try{using(var response=(HttpWebResponse)request.GetResponse())using(var reader=new StreamReader(response.GetResponseStream())){if(response.StatusCode!=HttpStatusCode.OK)throw new InvalidOperationException("DeepSeek 未返回余额");return BalanceSnapshot.Parse(reader.ReadToEnd());}}
   catch(WebException ex){var response=ex.Response as HttpWebResponse;if(response!=null){int status=(int)response.StatusCode;response.Dispose();throw new InvalidOperationException("DeepSeek 余额查询失败（HTTP "+status+"）");}throw new InvalidOperationException(ex.Status==WebExceptionStatus.Timeout?"余额查询超时":"无法连接 DeepSeek 余额接口");}
  }

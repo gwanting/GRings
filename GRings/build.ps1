@@ -36,9 +36,6 @@ $sources = @(
   /reference:System.Web.Extensions.dll `
   /reference:System.Core.dll `
   /reference:System.Security.dll `
-  /reference:C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF\UIAutomationClient.dll `
-  /reference:C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF\UIAutomationTypes.dll `
-  /reference:C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF\WindowsBase.dll `
   "/out:$output\GRings.exe" `
   @sources
 

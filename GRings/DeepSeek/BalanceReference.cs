@@ -15,7 +15,7 @@ sealed class BalanceReference {
   }catch(IOException){}catch(UnauthorizedAccessException){}catch(ArgumentException){}catch(InvalidOperationException){}catch(System.Collections.Generic.KeyNotFoundException){}
  }
  public void Observe(BalanceSnapshot value){if(String.IsNullOrEmpty(Currency)||Currency!=value.Currency){Set(value.Total,value.Currency,true);return;}if(Automatic&&value.Total>Amount)Set(value.Total,value.Currency,true);}
- public void Set(decimal amount,string currency,bool automatic){if(amount<0||(!automatic&&amount==0))throw new ArgumentOutOfRangeException("amount");Amount=amount;Currency=currency;Automatic=automatic;SaveError=null;try{File.WriteAllText(path,new JavaScriptSerializer().Serialize(new{amount=Amount,currency=Currency,automatic=Automatic}));}catch(IOException){SaveError="满圈基准未能保存";}catch(UnauthorizedAccessException){SaveError="满圈基准未能保存";}}
+ public void Set(decimal amount,string currency,bool automatic){if(amount<0||(!automatic&&amount==0))throw new ArgumentOutOfRangeException("amount");Amount=amount;Currency=currency;Automatic=automatic;SaveError=null;try{Directory.CreateDirectory(Path.GetDirectoryName(path));File.WriteAllText(path,new JavaScriptSerializer().Serialize(new{amount=Amount,currency=Currency,automatic=Automatic}));}catch(IOException){SaveError="满圈基准未能保存";}catch(UnauthorizedAccessException){SaveError="满圈基准未能保存";}}
  public decimal? Percent(BalanceSnapshot value){if(value==null||!value.Current||value.Currency!=Currency)return null;if(Amount==0)return value.Total==0?0m:(decimal?)null;return Math.Max(0m,Math.Min(100m,value.Total/Amount*100m));}
 }
 }
