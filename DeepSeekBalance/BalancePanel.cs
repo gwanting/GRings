@@ -37,16 +37,16 @@ sealed class BalancePanel:Form {
     backdrop.Configure(appearance.Light,appearance.Tint,appearance.BackgroundAlpha,Bounds);
     IntPtr unused=backdrop.Handle;
    }
+   if(!Visible)Show();
    IntPtr fgHandle=Handle;
    IntPtr hdwp=BeginDeferWindowPos(showBackdrop?2:1);
    if(hdwp!=IntPtr.Zero){
-    const uint flags=0x0010|0x0040|0x0200; // SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOOWNERZORDER
+    const uint flags=0x0010|0x0040|0x0200;
     hdwp=DeferWindowPos(hdwp,fgHandle,new IntPtr(-1),Left,Top,Width,Height,flags);
     if(showBackdrop&&hdwp!=IntPtr.Zero)hdwp=DeferWindowPos(hdwp,backdrop.Handle,fgHandle,Left,Top,Width,Height,flags);
     if(hdwp!=IntPtr.Zero)EndDeferWindowPos(hdwp);
    }
-   if(!Visible)Show();
-   if(showBackdrop&&!backdrop.Visible)backdrop.PlaceBehind(Handle);
+   if(showBackdrop&&!backdrop.Visible)backdrop.PlaceBehind(fgHandle);
    Update();
    if(showBackdrop)backdrop.Update();
   }finally{
@@ -56,8 +56,17 @@ sealed class BalancePanel:Form {
  public void HideAnimated(Point anchor){try{if(motion==null){Hide();return;}motion.Hide(anchor);}catch{if(motion!=null)motion.Dispose();motion=null;Hide();}}
  Bitmap CaptureMotionFrame(){
   if(cachedMotionFrame!=null)return (Bitmap)cachedMotionFrame.Clone();
-  bool wasVisible=Visible;double originalOpacity=Opacity;Bitmap raw=null;
-  suppressBackdrop=true;try{if(!wasVisible){Opacity=0;Show();}raw=new Bitmap(Width,Height,System.Drawing.Imaging.PixelFormat.Format24bppRgb);DrawToBitmap(raw,new Rectangle(0,0,Width,Height));}finally{if(!wasVisible)Hide();Opacity=originalOpacity;suppressBackdrop=false;SyncBackdrop();}
+  bool wasVisible=Visible;Point originalLocation=Location;double originalOpacity=Opacity;Bitmap raw=null;
+  suppressBackdrop=true;
+  try{
+   if(!wasVisible){Location=new Point(-32000,-32000);Opacity=0;Show();}
+   raw=new Bitmap(Width,Height,System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+   DrawToBitmap(raw,new Rectangle(0,0,Width,Height));
+  }finally{
+   if(!wasVisible){Hide();Opacity=originalOpacity;Location=originalLocation;}
+   suppressBackdrop=false;
+   if(wasVisible)SyncBackdrop();
+  }
   try{raw.MakeTransparent(Color.Black);var frame=new Bitmap(Width,Height,System.Drawing.Imaging.PixelFormat.Format32bppPArgb);using(var graphics=Graphics.FromImage(frame)){
    graphics.Clear(Color.Transparent);graphics.SmoothingMode=SmoothingMode.AntiAlias;
    if(appearance.Transparency<100){int alpha=appearance.BackgroundAlpha;Color tint=appearance.Light?Color.FromArgb(alpha,245,248,252):Color.FromArgb(alpha,24,32,45);using(var shape=new GraphicsPath()){shape.AddArc(0,0,28,28,180,90);shape.AddArc(Width-28,0,28,28,270,90);shape.AddArc(Width-28,Height-28,28,28,0,90);shape.AddArc(0,Height-28,28,28,90,90);shape.CloseFigure();using(var fill=new SolidBrush(tint))graphics.FillPath(fill,shape);}}
