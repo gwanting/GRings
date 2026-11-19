@@ -12,6 +12,7 @@ sealed class BalancePanel:Form {
  [DllImport("dwmapi.dll")]static extern int DwmExtendFrameIntoClientArea(IntPtr window,ref GlassMargins margins);
  [StructLayout(LayoutKind.Sequential)]struct AccentPolicy{public int State,Flags,Color,Animation;}
  [StructLayout(LayoutKind.Sequential)]struct CompositionData{public int Attribute;public IntPtr Data;public int Size;}
+ [DllImport("dwmapi.dll")]static extern int DwmFlush();
  [DllImport("user32.dll")]static extern int SetWindowCompositionAttribute(IntPtr window,ref CompositionData data);
  [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr window,int message,IntPtr wparam,IntPtr lparam);
  [DllImport("user32.dll")]static extern IntPtr BeginDeferWindowPos(int count);
@@ -27,8 +28,8 @@ sealed class BalancePanel:Form {
  public bool IsOpen{get{return motion==null?Visible:motion.TargetVisible;}}
  public bool IsPanelShown{get{return Visible||(motion!=null&&motion.Running);}}
  public void HideImmediately(){if(motion!=null){motion.Dispose();motion=null;}Hide();}
- public void ShowAnimated(Point anchor){try{if(motion==null)motion=new PanelMotion(this,CaptureMotionFrame,RevealWithBackdrop);motion.Show(anchor);}catch{if(motion!=null)motion.Dispose();motion=null;Opacity=1;ApplyAppearance();Show();}}
- void RevealWithBackdrop(){
+ public void ShowAnimated(Point anchor){try{if(motion==null)motion=new PanelMotion(this,CaptureMotionFrame,RevealBehindMotion);motion.Show(anchor);}catch{if(motion!=null)motion.Dispose();motion=null;Opacity=1;ApplyAppearance();Show();}}
+ void RevealBehindMotion(IntPtr motionHandle){
   suppressBackdrop=true;
   try{
    if(backdrop==null&&!Disposing&&!IsDisposed){backdrop=new PanelBackdrop();backdrop.BackgroundMouseDown+=ForwardBackdropInput;}
@@ -39,16 +40,22 @@ sealed class BalancePanel:Form {
    }
    if(!Visible)Show();
    IntPtr fgHandle=Handle;
-   IntPtr hdwp=BeginDeferWindowPos(showBackdrop?2:1);
+   bool hasMotion=motionHandle!=IntPtr.Zero;
+   IntPtr hdwp=BeginDeferWindowPos((hasMotion?1:0)+(showBackdrop?2:1));
    if(hdwp!=IntPtr.Zero){
-    const uint flags=0x0010|0x0040|0x0200;
-    hdwp=DeferWindowPos(hdwp,fgHandle,new IntPtr(-1),Left,Top,Width,Height,flags);
-    if(showBackdrop&&hdwp!=IntPtr.Zero)hdwp=DeferWindowPos(hdwp,backdrop.Handle,fgHandle,Left,Top,Width,Height,flags);
+    const uint showFlags=0x0010|0x0040|0x0200; // SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOOWNERZORDER
+    const uint keepFlags=0x0001|0x0002|0x0010|0x0200; // SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER
+    if(hasMotion)hdwp=DeferWindowPos(hdwp,motionHandle,new IntPtr(-1),0,0,0,0,keepFlags);
+    if(hdwp!=IntPtr.Zero)hdwp=DeferWindowPos(hdwp,fgHandle,hasMotion?motionHandle:new IntPtr(-1),Left,Top,Width,Height,showFlags);
+    if(showBackdrop&&hdwp!=IntPtr.Zero)hdwp=DeferWindowPos(hdwp,backdrop.Handle,fgHandle,Left,Top,Width,Height,showFlags);
     if(hdwp!=IntPtr.Zero)EndDeferWindowPos(hdwp);
    }
    if(showBackdrop&&!backdrop.Visible)backdrop.PlaceBehind(fgHandle);
    Update();
    if(showBackdrop)backdrop.Update();
+   // Wait one VSync (~6ms on high-refresh displays) while MotionSurface still covers the panel,
+   // so DWM finishes compositing the Acrylic blur + foreground before MotionSurface disappears.
+   if(hasMotion)try{DwmFlush();}catch{}
   }finally{
    suppressBackdrop=false;
   }

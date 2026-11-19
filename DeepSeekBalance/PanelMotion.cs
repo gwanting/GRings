@@ -14,7 +14,7 @@ sealed class PanelMotion:IDisposable {
  [DllImport("winmm.dll")]static extern uint timeEndPeriod(uint period);
  readonly Form owner;
  readonly Func<Bitmap> capture;
- readonly Action restore;
+ readonly Action<IntPtr> restore;
  readonly Stopwatch clock=new Stopwatch();
  MotionSurface surface;
  Rectangle from,to,fullBounds,currentBounds;
@@ -28,7 +28,7 @@ sealed class PanelMotion:IDisposable {
  public double LastFps{get;private set;}
  public bool Running{get{return running;}}
  public bool TargetVisible{get{return running?opening:owner.Visible;}}
- public PanelMotion(Form form,Func<Bitmap> snapshot,Action refresh){owner=form;capture=snapshot;restore=refresh;}
+ public PanelMotion(Form form,Func<Bitmap> snapshot,Action<IntPtr> refresh){owner=form;capture=snapshot;restore=refresh;}
  static Rectangle Small(Rectangle full,Point center){int w=Math.Max(1,(int)Math.Round(full.Width*0.22)),h=Math.Max(1,(int)Math.Round(full.Height*0.22));return new Rectangle(center.X-w/2,center.Y-h/2,w,h);}
  void EnableHighRes(bool enable){if(enable==highResTimer)return;highResTimer=enable;try{if(enable)timeBeginPeriod(1);else timeEndPeriod(1);}catch{}}
  public void Show(Point origin){
@@ -93,7 +93,8 @@ sealed class PanelMotion:IDisposable {
  void Finish(int myGen,bool isOpening){
   if(disposed||generation!=myGen)return;
   running=false;clock.Stop();EnableHighRes(false);
-  if(isOpening&&!owner.IsDisposed){owner.Bounds=fullBounds;restore();}
+  IntPtr surfHandle=surface!=null&&!surface.IsDisposed&&surface.IsHandleCreated?surface.Handle:IntPtr.Zero;
+  if(isOpening&&!owner.IsDisposed){owner.Bounds=fullBounds;restore(surfHandle);}
   if(surface!=null){surface.Dispose();surface=null;}
  }
  static int Mix(int a,int b,double amount){return (int)Math.Round(a+(b-a)*amount);}
