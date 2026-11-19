@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -20,14 +20,50 @@ class Window {
  public string Countdown(DateTimeOffset now) { if(!Reset.HasValue)return "重置时间未知"; var t=Reset.Value-now; if(t.TotalSeconds<=0)return "已到重置时间，等待刷新确认"; return t.TotalDays>=1?String.Format("距重置 {0}天 {1}小时",(int)t.TotalDays,t.Hours):String.Format("距重置 {0}小时 {1}分钟",(int)t.TotalHours,t.Minutes); }
 }
 class Snapshot {
- public DateTimeOffset Fetched; public string Plan;public string Source="实时接口"; public List<Window> Windows=new List<Window>();
+ public DateTimeOffset Fetched; public string Plan; public int? ResetCredits; public string Source="实时接口"; public List<Window> Windows=new List<Window>();
  public Window Focus { get {return Windows.Where(x=>x.Remaining.HasValue).OrderBy(x=>x.Remaining).FirstOrDefault();} }
  public bool IsCurrent(Window window,DateTimeOffset now){return window!=null&&window.Remaining.HasValue&&Fetched<=now.AddSeconds(5)&&now-Fetched<=TimeSpan.FromSeconds(90)&&(!window.Reset.HasValue||window.Reset.Value>now);}
  public static Snapshot Merge(Snapshot a,Snapshot b){
   if(a==null)return b;if(b==null)return a;var newer=a.Fetched>b.Fetched?a:b;var older=Object.ReferenceEquals(newer,a)?b:a;
-  var result=new Snapshot{Fetched=newer.Fetched,Plan=newer.Plan,Source=newer.Source};
+  var result=new Snapshot{Fetched=newer.Fetched,Plan=newer.Plan,ResetCredits=newer.ResetCredits??older.ResetCredits,Source=newer.Source};
   foreach(var window in newer.Windows){var previous=older.Windows.Find(w=>w.Minutes==window.Minutes);var remaining=window.Remaining;if(previous!=null&&window.Reset.HasValue&&previous.Reset==window.Reset&&previous.Remaining.HasValue&&remaining.HasValue)remaining=Math.Min(remaining.Value,previous.Remaining.Value);result.Windows.Add(new Window{Remaining=remaining,Minutes=window.Minutes,Reset=window.Reset,Name=window.Name});}
   return result;
+ }
+ public static Snapshot ParseAppServer(string json) {
+  var root=Json.Read(json); if(root==null)return null;
+  object rawResult; if(!root.TryGetValue("result",out rawResult))return null;
+  var res=rawResult as Dictionary<string,object>; if(res==null)return null;
+  Dictionary<string,object> limits=null;
+  object rawById;
+  if(res.TryGetValue("rateLimitsByLimitId",out rawById)&&rawById is Dictionary<string,object>){
+   object codexBucket;
+   if(((Dictionary<string,object>)rawById).TryGetValue("codex",out codexBucket))limits=codexBucket as Dictionary<string,object>;
+  }
+  if(limits==null){
+   object rawLimits; if(res.TryGetValue("rateLimits",out rawLimits))limits=rawLimits as Dictionary<string,object>;
+  }
+  if(limits==null)return null;
+  var s=new Snapshot{Fetched=DateTimeOffset.Now,Plan=Json.Text(limits,"planType"),Source="实时接口"};
+  object rawResetCredits;
+  if(res.TryGetValue("rateLimitResetCredits",out rawResetCredits)&&rawResetCredits is Dictionary<string,object>){
+   var count=Json.Number((Dictionary<string,object>)rawResetCredits,"availableCount");
+   if(count.HasValue)s.ResetCredits=(int)Math.Max(0,Math.Floor(count.Value));
+  }
+  foreach(var slot in new[]{"primary","secondary"}){
+   object rawSlot; if(!limits.TryGetValue(slot,out rawSlot))continue;
+   var q=rawSlot as Dictionary<string,object>; if(q==null)continue;
+   var used=Json.Number(q,"usedPercent");
+   var minutes=Json.Number(q,"windowDurationMins");
+   var reset=Json.Number(q,"resetsAt");
+   if(!used.HasValue||!minutes.HasValue)continue;
+   s.Windows.Add(new Window{
+    Remaining=Math.Max(0,Math.Min(100,100-used.Value)),
+    Minutes=(int)minutes.Value,
+    Reset=reset.HasValue?new DateTimeOffset(1970,1,1,0,0,0,TimeSpan.Zero).AddSeconds(reset.Value):(DateTimeOffset?)null,
+    Name=slot
+   });
+  }
+  return s.Windows.Count==0?null:s;
  }
  public static Snapshot Parse(string json) {
   var d=Json.Read(json); var s=new Snapshot(); s.Fetched=DateTimeOffset.Parse(Convert.ToString(d["FetchedAt"])); s.Plan=Convert.ToString(d["Plan"]);
