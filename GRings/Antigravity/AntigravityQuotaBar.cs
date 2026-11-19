@@ -175,7 +175,7 @@ namespace AntigravityQuotaBar {
                 ringClicks.Cancel();
                 ringPressed = ringRightPressed = false;
                 ContextMenuStrip.Close();
-                if (card != null) card.Hide();
+                if (card != null) card.HideImmediately();
                 ShowWindow(Handle, 0);
             } else if (!closing && IsHandleCreated) {
                 BeginInvoke(new Action(() => {
@@ -337,7 +337,7 @@ namespace AntigravityQuotaBar {
                     if (InsideCircle(point)) try { BeginInvoke(new Action(() => HandleRingClick(new Point(point.X, point.Y)))); } catch (InvalidOperationException) { }
                     return new IntPtr(1);
                 }
-                if ((ContextMenuStrip.Visible || (card != null && card.Visible)) && (kind == 0x201 || kind == 0x204 || kind == 0x207)) {
+                if ((ContextMenuStrip.Visible || (card != null && card.IsOpen)) && (kind == 0x201 || kind == 0x204 || kind == 0x207)) {
                     try { BeginInvoke(new Action(() => DismissOutside(point))); } catch (InvalidOperationException) { }
                 }
             }
@@ -351,9 +351,9 @@ namespace AntigravityQuotaBar {
 
         void DismissOutside(NativePoint point) {
             if (closing) return;
-            if (card != null && card.Visible) {
+            if (card != null && card.IsOpen) {
                 if (PointInWindow(card.Handle, point)) return;
-                card.Hide();
+                card.HideAnimated(new Point(Left + Width / 2, Top + Height / 2));
             }
             if (ContextMenuStrip.Visible) {
                 if (PointInWindow(ContextMenuStrip.Handle, point)) return;
@@ -374,7 +374,8 @@ namespace AntigravityQuotaBar {
         void TogglePanel() {
             if (fullscreenHidden || closing) return;
             if (ContextMenuStrip.Visible) { ContextMenuStrip.Close(); return; }
-            if (card != null && card.Visible) { card.Hide(); return; }
+            Point anchor = new Point(Left + Width / 2, Top + Height / 2);
+            if (card != null && card.IsOpen) { card.HideAnimated(anchor); return; }
 
             if (card == null) {
                 card = new AntigravityCard(HandleSetupAction);
@@ -385,7 +386,7 @@ namespace AntigravityQuotaBar {
             int x = Math.Max(area.Left + 8, Math.Min(Left + (Width - card.Width) / 2, area.Right - card.Width - 8));
             int y = Math.Max(area.Top + 8, Math.Min(Top - card.Height - 8, area.Bottom - card.Height - 8));
             card.Location = new Point(x, y);
-            card.Show();
+            card.ShowAnimated(anchor);
             Fetch();
         }
 

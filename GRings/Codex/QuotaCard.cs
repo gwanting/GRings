@@ -1,11 +1,15 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using DeepSeekBalance;
 using QuotaData;
 
 namespace DualQuotaBar {
     sealed class QuotaCard : Form {
+        [DllImport("dwmapi.dll")] static extern int DwmFlush();
+        [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr hwnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
         static readonly Color Surface = Color.FromArgb(28, 28, 30);
         static readonly Color Muted = Color.FromArgb(172, 178, 188);
         static readonly Color Accent = Color.FromArgb(58, 205, 215);
@@ -16,8 +20,84 @@ namespace DualQuotaBar {
         readonly Font sectionFont = CardFont(20, FontStyle.Bold);
         readonly Font bodyFont = CardFont(16);
         readonly Font budgetFont = CardFont(15);
+        PanelMotion motion;
+        Bitmap cachedMotionFrame;
+        string lastMotionKey;
         int collapsedHeight;
         bool expanded;
+
+        public bool IsOpen { get { return motion == null ? Visible : motion.TargetVisible; } }
+        public void HideImmediately() { if (motion != null) { motion.Dispose(); motion = null; } Hide(); }
+        public void ShowAnimated(Point anchor) {
+            try {
+                if (motion == null) motion = new PanelMotion(this, CaptureMotionFrame, RevealBehindMotion);
+                motion.Show(anchor);
+            } catch {
+                if (motion != null) { motion.Dispose(); motion = null; }
+                Show();
+            }
+        }
+        public void HideAnimated(Point anchor) {
+            try {
+                if (motion == null) { Hide(); return; }
+                motion.Hide(anchor);
+            } catch {
+                if (motion != null) { motion.Dispose(); motion = null; }
+                Hide();
+            }
+        }
+        void InvalidateMotionCache() { if (cachedMotionFrame != null) { cachedMotionFrame.Dispose(); cachedMotionFrame = null; } }
+        void RevealBehindMotion(IntPtr motionHandle) {
+            if (!Visible) Show();
+            const uint showFlags = 0x0010 | 0x0040 | 0x0200;
+            const uint keepFlags = 0x0001 | 0x0002 | 0x0010 | 0x0200;
+            if (motionHandle != IntPtr.Zero) {
+                SetWindowPos(motionHandle, new IntPtr(-1), 0, 0, 0, 0, keepFlags);
+                SetWindowPos(Handle, motionHandle, Left, Top, Width, Height, showFlags);
+            } else {
+                SetWindowPos(Handle, new IntPtr(-1), Left, Top, Width, Height, showFlags);
+            }
+            Update();
+            if (motionHandle != IntPtr.Zero) try { DwmFlush(); } catch { }
+        }
+        Bitmap CaptureMotionFrame() {
+            if (cachedMotionFrame != null) return (Bitmap)cachedMotionFrame.Clone();
+            bool wasVisible = Visible;
+            Point originalLocation = Location;
+            Bitmap raw = null;
+            try {
+                if (!wasVisible) { Location = new Point(-32000, -32000); Show(); }
+                raw = new Bitmap(Width, Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                DrawToBitmap(raw, new Rectangle(0, 0, Width, Height));
+            } finally {
+                if (!wasVisible) { Hide(); Location = originalLocation; }
+            }
+            var frame = new Bitmap(Width, Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+            using (var g = Graphics.FromImage(frame))
+            using (var clip = RoundedShape(Width, Height, 24)) {
+                g.Clear(Color.Transparent);
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.SetClip(clip);
+                g.DrawImageUnscaled(raw, 0, 0);
+            }
+            raw.Dispose();
+            cachedMotionFrame = (Bitmap)frame.Clone();
+            return frame;
+        }
+        static GraphicsPath RoundedShape(int w, int h, int d) {
+            var p = new GraphicsPath();
+            p.AddArc(0, 0, d, d, 180, 90);
+            p.AddArc(w - d, 0, d, d, 270, 90);
+            p.AddArc(w - d, h - d, d, d, 0, 90);
+            p.AddArc(0, h - d, d, d, 90, 90);
+            p.CloseFigure();
+            return p;
+        }
+        void UpdateRegion() {
+            if (Width < 24 || Height < 24) return;
+            using (var p = RoundedShape(Width, Height, 24)) Region = new Region(p);
+        }
+        protected override void OnSizeChanged(EventArgs e) { base.OnSizeChanged(e); UpdateRegion(); InvalidateMotionCache(); }
 
         protected override bool ShowWithoutActivation { get { return true; } }
 
@@ -71,6 +151,8 @@ namespace DualQuotaBar {
         protected override void Dispose(bool disposing) {
             base.Dispose(disposing);
             if (!disposing) return;
+            InvalidateMotionCache();
+            if (motion != null) { motion.Dispose(); motion = null; }
             titleFont.Dispose();
             sectionFont.Dispose();
             bodyFont.Dispose();
@@ -117,6 +199,8 @@ namespace DualQuotaBar {
                 resetCardsValue.ForeColor = Muted;
             }
             paceText.Text = "5 小时  " + PaceText(shortWindow, shortCurrent, now) + "\n本周     " + PaceText(weeklyWindow, weeklyCurrent, now);
+            string key = plan.Text + "|" + status.Text + "|" + shortRemaining.Text + "|" + shortReset.Text + "|" + weeklyRemaining.Text + "|" + weeklyReset.Text + "|" + resetCardsValue.Text + "|" + expanded;
+            if (key != lastMotionKey) { lastMotionKey = key; InvalidateMotionCache(); }
         }
 
         static string PlanText(string value) {

@@ -57,7 +57,7 @@ class Bar:Form {
   refresh=new System.Windows.Forms.Timer{Interval=30000};refresh.Tick+=(s,e)=>Fetch();refresh.Start();position=new System.Windows.Forms.Timer{Interval=1000};position.Tick+=(s,e)=>{Place();ApplyLocalQuota();UpdateStatus();Render();};position.Start();Shown+=(s,e)=>{fullscreen.Start();Place();Render();Fetch();mouseCallback=OnMouse;mouseHook=SetWindowsHookEx(14,mouseCallback,GetModuleHandle(null),0);};MouseEnter+=(s,e)=>{if(snapshot==null||DateTime.Now-fetched>TimeSpan.FromSeconds(5))Fetch();};FormClosed+=(s,e)=>{closing=true;ringClicks.Dispose();fullscreen.Dispose();if(quotaCard!=null)quotaCard.Dispose();if(localFeed!=null)localFeed.Dispose();if(mouseHook!=IntPtr.Zero)UnhookWindowsHookEx(mouseHook);refresh.Dispose();position.Dispose();tip.Dispose();};
  }
  protected override void WndProc(ref Message m){if(m.Msg==0x21){m.Result=new IntPtr(3);return;}if(m.Msg==0x202){long bits=m.LParam.ToInt64();var p=new Point((short)(bits&65535),(short)((bits>>16)&65535));if(ClientRectangle.Contains(p))BeginInvoke(new Action(()=>HandleRingClick(PointToScreen(p))));m.Result=IntPtr.Zero;return;}base.WndProc(ref m);}
- void FullscreenChanged(bool hidden){fullscreenHidden=hidden;if(hidden){ringClicks.Cancel();ringPressed=ringRightPressed=false;ContextMenuStrip.Close();if(quotaCard!=null)quotaCard.Hide();ShowWindow(Handle,0);}else if(!closing&&IsHandleCreated)BeginInvoke(new Action(()=>{if(!closing&&!fullscreenHidden){Place();Render();}}));}
+ void FullscreenChanged(bool hidden){fullscreenHidden=hidden;if(hidden){ringClicks.Cancel();ringPressed=ringRightPressed=false;ContextMenuStrip.Close();if(quotaCard!=null)quotaCard.HideImmediately();ShowWindow(Handle,0);}else if(!closing&&IsHandleCreated)BeginInvoke(new Action(()=>{if(!closing&&!fullscreenHidden){Place();Render();}}));}
  void Place(){if(fullscreen!=null&&fullscreen.Refresh())return;var task=FindWindow("Shell_TrayWnd",null);Rect t,n;int x,y;if(task!=IntPtr.Zero&&GetWindowRect(task,out t)){var tray=FindWindowEx(task,IntPtr.Zero,"TrayNotifyWnd",null);int right=GetWindowRect(tray,out n)?n.Left-10:t.Right-300;x=Math.Max(t.Left+10,right-Width);y=t.Top+Math.Max(0,(t.Bottom-t.Top-Height)/2);}else{var r=Screen.PrimaryScreen.WorkingArea;x=r.Right-Width-12;y=r.Bottom-Height-8;}SetWindowPos(Handle,new IntPtr(-1),x,y,0,0,(uint)(Left==x&&Top==y?0x53:0x51));}
  Window Quota(int minutes){return snapshot==null?null:snapshot.Windows.Find(w=>w.Minutes==minutes);}
  void ApplyLocalQuota(){if(localFeed==null)return;var candidate=localFeed.Poll();if(candidate!=null&&!Object.ReferenceEquals(candidate,lastLocalApplied)){lastLocalApplied=candidate;snapshot=Snapshot.Merge(snapshot,candidate);fetched=snapshot.Fetched.LocalDateTime;error=null;}}
@@ -115,9 +115,9 @@ class Bar:Form {
  void DrawPercentage(Graphics g){var quota=Quota(300);string value=Current(quota)?quota.Percent.Replace("%",""):"--";bool stale=error!=null||!Current(quota);using(var format=new StringFormat(StringFormat.GenericTypographic)){format.Alignment=StringAlignment.Center;format.LineAlignment=StringAlignment.Center;using(var font=new Font("Segoe UI",value.Length>2?15:19,FontStyle.Bold,GraphicsUnit.Pixel))using(var brush=new SolidBrush(blackDigits?Color.Black:stale?Color.FromArgb(151,163,174):Color.FromArgb(240,247,253)))g.DrawString(value,font,brush,new RectangleF(16,18,28,24),format);}}
  void DrawRing(Graphics g,RectangleF bounds,float thickness,Window window,Color color){using(var track=new Pen(Color.FromArgb(100,color),thickness))g.DrawEllipse(track,bounds);if(!Current(window))return;float sweep=(float)(Math.Max(0,Math.Min(100,window.Remaining.Value))*3.6);RingArc.Draw(g,bounds,thickness,sweep,color);}
  bool InsideCircle(NativePoint point){if(fullscreenHidden)return false;double x=point.X-Left-Width/2.0,y=point.Y-Top-Height/2.0;return x*x+y*y<=Width*Width/4.0;}
- IntPtr OnMouse(int code,IntPtr message,IntPtr data){if(code>=0&&!closing&&!fullscreenHidden){int kind=message.ToInt32();var point=((MouseEvent)Marshal.PtrToStructure(data,typeof(MouseEvent))).Point;if(kind==0x204&&InsideCircle(point)){ringRightPressed=true;return new IntPtr(1);}if(kind==0x205&&ringRightPressed){ringRightPressed=false;if(InsideCircle(point))try{BeginInvoke(new Action(()=>{ringClicks.Cancel();if(!closing&&!fullscreenHidden){ContextMenuStrip.Show(new Point(point.X,point.Y));SetForegroundWindow(ContextMenuStrip.Handle);}}));}catch(InvalidOperationException){}return new IntPtr(1);}if(kind==0x201&&InsideCircle(point)){ringPressed=true;return new IntPtr(1);}if(kind==0x202&&ringPressed){ringPressed=false;if(InsideCircle(point))try{BeginInvoke(new Action(()=>HandleRingClick(new Point(point.X,point.Y))));}catch(InvalidOperationException){}return new IntPtr(1);}if((ContextMenuStrip.Visible||(quotaCard!=null&&quotaCard.Visible))&&(kind==0x201||kind==0x204||kind==0x207))try{BeginInvoke(new Action(()=>DismissOutside(point)));}catch(InvalidOperationException){}}return CallNextHookEx(mouseHook,code,message,data);}
+ IntPtr OnMouse(int code,IntPtr message,IntPtr data){if(code>=0&&!closing&&!fullscreenHidden){int kind=message.ToInt32();var point=((MouseEvent)Marshal.PtrToStructure(data,typeof(MouseEvent))).Point;if(kind==0x204&&InsideCircle(point)){ringRightPressed=true;return new IntPtr(1);}if(kind==0x205&&ringRightPressed){ringRightPressed=false;if(InsideCircle(point))try{BeginInvoke(new Action(()=>{ringClicks.Cancel();if(!closing&&!fullscreenHidden){ContextMenuStrip.Show(new Point(point.X,point.Y));SetForegroundWindow(ContextMenuStrip.Handle);}}));}catch(InvalidOperationException){}return new IntPtr(1);}if(kind==0x201&&InsideCircle(point)){ringPressed=true;return new IntPtr(1);}if(kind==0x202&&ringPressed){ringPressed=false;if(InsideCircle(point))try{BeginInvoke(new Action(()=>HandleRingClick(new Point(point.X,point.Y))));}catch(InvalidOperationException){}return new IntPtr(1);}if((ContextMenuStrip.Visible||(quotaCard!=null&&quotaCard.IsOpen))&&(kind==0x201||kind==0x204||kind==0x207))try{BeginInvoke(new Action(()=>DismissOutside(point)));}catch(InvalidOperationException){}}return CallNextHookEx(mouseHook,code,message,data);}
  static bool PointInWindow(IntPtr handle,NativePoint point){Rect r;return handle!=IntPtr.Zero&&GetWindowRect(handle,out r)&&point.X>=r.Left&&point.X<r.Right&&point.Y>=r.Top&&point.Y<r.Bottom;}
- void DismissOutside(NativePoint point){if(closing)return;if(quotaCard!=null&&quotaCard.Visible){if(PointInWindow(quotaCard.Handle,point))return;quotaCard.Hide();}if(ContextMenuStrip.Visible){if(PointInWindow(ContextMenuStrip.Handle,point))return;ContextMenuStrip.Close();}}
+ void DismissOutside(NativePoint point){if(closing)return;if(quotaCard!=null&&quotaCard.IsOpen){if(PointInWindow(quotaCard.Handle,point))return;quotaCard.HideAnimated(new Point(Left+Width/2,Top+Height/2));}if(ContextMenuStrip.Visible){if(PointInWindow(ContextMenuStrip.Handle,point))return;ContextMenuStrip.Close();}}
  void HandleRingClick(Point screenPoint){
   if(closing||fullscreenHidden)return;
   if(ContextMenuStrip.Visible){ringClicks.Cancel();ContextMenuStrip.Close();return;}
@@ -126,7 +126,8 @@ class Bar:Form {
  void TogglePanel() {
   if (fullscreenHidden || closing) return;
   if (ContextMenuStrip.Visible) { ContextMenuStrip.Close(); return; }
-  if (quotaCard != null && quotaCard.Visible) { quotaCard.Hide(); return; }
+  Point anchor = new Point(Left + Width / 2, Top + Height / 2);
+  if (quotaCard != null && quotaCard.IsOpen) { quotaCard.HideAnimated(anchor); return; }
 
   if (quotaCard == null) quotaCard = new QuotaCard();
   quotaCard.UpdateQuota(snapshot, busy, error != null);
@@ -134,7 +135,7 @@ class Bar:Form {
   int x = Math.Max(area.Left + 8, Math.Min(Left + (Width - quotaCard.Width) / 2, area.Right - quotaCard.Width - 8));
   int y = Math.Max(area.Top + 8, Math.Min(Top - quotaCard.Height - 8, area.Bottom - quotaCard.Height - 8));
   quotaCard.Location = new Point(x, y);
-  quotaCard.Show();
+  quotaCard.ShowAnimated(anchor);
   Fetch();
  }
 }
