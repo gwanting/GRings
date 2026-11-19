@@ -67,7 +67,7 @@ class Bar:Form {
  Snapshot Read(){
   var direct=ReadAppServer();
   if(direct!=null)return direct;
-  throw new Exception("未检测到本机 Codex 应用或 CLI");
+  throw new Exception("Codex 额度读取失败，请检查网络或代理连接");
  }
  static string FindCodexExe(){
   var envPath=Environment.GetEnvironmentVariable("PATH");
@@ -79,8 +79,17 @@ class Bar:Form {
   return null;
  }
  static Snapshot ReadAppServer(){
-  var codex=FindCodexExe();if(String.IsNullOrEmpty(codex))return null;
+  var codex=FindCodexExe();if(String.IsNullOrEmpty(codex))throw new Exception("未检测到本机 Codex 应用或 CLI");
   var psi=new ProcessStartInfo(codex,"app-server"){UseShellExecute=false,RedirectStandardInput=true,RedirectStandardOutput=true,RedirectStandardError=true,CreateNoWindow=true,StandardOutputEncoding=Encoding.UTF8};
+  try{
+   var destination=new Uri("https://chatgpt.com");
+   var proxy=System.Net.WebRequest.GetSystemWebProxy().GetProxy(destination);
+   if(proxy!=null&&!proxy.Equals(destination)){
+    string proxyUrl=proxy.AbsoluteUri.TrimEnd('/');
+    if(String.IsNullOrEmpty(psi.EnvironmentVariables["HTTPS_PROXY"]))psi.EnvironmentVariables["HTTPS_PROXY"]=proxyUrl;
+    if(String.IsNullOrEmpty(psi.EnvironmentVariables["HTTP_PROXY"]))psi.EnvironmentVariables["HTTP_PROXY"]=proxyUrl;
+   }
+  }catch{}
   using(var p=Process.Start(psi)){
    try{
     p.StandardInput.WriteLine("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"clientInfo\":{\"name\":\"DualQuotaBar\",\"version\":\"1.0\"}}}");
