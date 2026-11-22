@@ -23,13 +23,21 @@ namespace AntigravityQuotaBar {
             get { return Remaining.HasValue ? Math.Round(Remaining.Value, MidpointRounding.AwayFromZero).ToString("0") + "%" : "--"; }
         }
 
-        public string ResetText(DateTimeOffset now) {
+        public string ResetText(DateTimeOffset now, bool isWeekly) {
             if (Reset.HasValue) {
                 TimeSpan time = Reset.Value - now;
                 if (time <= TimeSpan.Zero) return "等待重置确认";
-                if (time.TotalDays >= 1) return String.Format("{0} 天 {1} 小时后重置", (int)time.TotalDays, time.Hours);
-                if (time.TotalMinutes < 1) return "不到 1 分钟后重置";
-                return String.Format("{0} 小时 {1} 分钟后重置", time.Hours, time.Minutes);
+                DateTimeOffset localReset = Reset.Value.ToLocalTime();
+                DateTimeOffset localNow = now.ToLocalTime();
+                if (isWeekly) {
+                    string dateClock = localReset.ToString("M月d日 HH:mm");
+                    if (time.TotalDays >= 1) return String.Format("{0} 重置（{1}天{2}时）", dateClock, (int)time.TotalDays, time.Hours);
+                    if (time.TotalMinutes < 1) return dateClock + " 重置（<1分）";
+                    return String.Format("{0} 重置（{1}小时{2}分）", dateClock, (int)time.TotalHours, time.Minutes);
+                }
+                string clock = localReset.Date == localNow.Date ? localReset.ToString("HH:mm") : "次日 " + localReset.ToString("HH:mm");
+                if (time.TotalMinutes < 1) return clock + " 重置（<1分）";
+                return String.Format("{0} 重置（{1}小时{2}分）", clock, (int)time.TotalHours, time.Minutes);
             }
             return String.IsNullOrWhiteSpace(ResetRaw) ? "重置时间未知" : ResetRaw;
         }

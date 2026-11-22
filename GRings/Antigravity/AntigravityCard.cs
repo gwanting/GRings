@@ -121,13 +121,13 @@ namespace AntigravityQuotaBar {
 
             primaryTitle = AddText("Gemini · 5 小时", 12, 108, 444, 34, sectionFont);
             primaryBar = AddLine(148, outerColor);
-            primaryRemaining = AddText("— 剩余", 12, 164, 155, 28);
-            primaryReset = AddText("等待读取", 167, 164, 289, 28, color: Muted, alignment: ContentAlignment.MiddleRight);
+            primaryRemaining = AddText("— 剩余", 12, 164, 120, 28);
+            primaryReset = AddText("等待读取", 132, 164, 324, 28, color: Muted, alignment: ContentAlignment.MiddleRight);
 
             secondaryTitle = AddText("Gemini · 本周", 12, 208, 444, 34, sectionFont);
             secondaryBar = AddLine(248, innerColor);
-            secondaryRemaining = AddText("— 剩余", 12, 264, 155, 28);
-            secondaryReset = AddText("等待读取", 167, 264, 289, 28, color: Muted, alignment: ContentAlignment.MiddleRight);
+            secondaryRemaining = AddText("— 剩余", 12, 264, 120, 28);
+            secondaryReset = AddText("等待读取", 132, 264, 324, 28, color: Muted, alignment: ContentAlignment.MiddleRight);
 
             AddText("Claude / GPT", 12, 306, 155, 26, color: Muted);
             thirdPartyValue = AddText("—", 167, 306, 289, 26, color: Muted, alignment: ContentAlignment.MiddleRight);
@@ -203,8 +203,8 @@ namespace AntigravityQuotaBar {
                 status.ForeColor = Muted;
             }
 
-            UpdateRow(snapshot != null ? snapshot.Primary : null, "Gemini · 5 小时", current, now, primaryTitle, primaryRemaining, primaryReset, primaryBar);
-            UpdateRow(snapshot != null ? snapshot.Secondary : null, "Gemini · 本周", current, now, secondaryTitle, secondaryRemaining, secondaryReset, secondaryBar);
+            UpdateRow(snapshot != null ? snapshot.Primary : null, "Gemini · 5 小时", current, now, false, primaryTitle, primaryRemaining, primaryReset, primaryBar);
+            UpdateRow(snapshot != null ? snapshot.Secondary : null, "Gemini · 本周", current, now, true, secondaryTitle, secondaryRemaining, secondaryReset, secondaryBar);
 
             var p3Five = snapshot != null ? snapshot.FindById("3p-5h") : null;
             var p3Week = snapshot != null ? snapshot.FindById("3p-weekly") : null;
@@ -232,12 +232,12 @@ namespace AntigravityQuotaBar {
             if (key != lastMotionKey) { lastMotionKey = key; InvalidateMotionCache(); }
         }
 
-        static void UpdateRow(QuotaPool pool, string fallbackTitle, bool current, DateTimeOffset now,
+        static void UpdateRow(QuotaPool pool, string fallbackTitle, bool current, DateTimeOffset now, bool isWeekly,
             Label title, Label remaining, Label reset, ProgressLine bar) {
             title.Text = pool != null && !String.IsNullOrWhiteSpace(pool.Name) ? pool.Name : fallbackTitle;
             bool valid = current && pool != null && pool.Remaining.HasValue;
             remaining.Text = valid ? pool.Percent + " 剩余" : "— 剩余";
-            reset.Text = pool == null ? "等待数据" : pool.ResetText(now);
+            reset.Text = pool == null ? "等待数据" : pool.ResetText(now, isWeekly);
             bar.SetValue(valid ? pool.Remaining.Value : 0);
         }
 

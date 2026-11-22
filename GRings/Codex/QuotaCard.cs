@@ -118,12 +118,12 @@ namespace DualQuotaBar {
             plan = AddText("", 220, 54, 238, 24, color: Muted, alignment: ContentAlignment.MiddleRight);
             AddText("5 小时", 10, 110, 445, 34, sectionFont);
             shortBar = AddLine(150);
-            shortRemaining = AddText("", 10, 166, 153, 29);
-            shortReset = AddText("", 163, 166, 295, 29, color: Muted, alignment: ContentAlignment.MiddleRight);
+            shortRemaining = AddText("", 10, 166, 120, 29);
+            shortReset = AddText("", 130, 166, 328, 29, color: Muted, alignment: ContentAlignment.MiddleRight);
             AddText("本周", 10, 211, 445, 34, sectionFont);
             weeklyBar = AddLine(251);
-            weeklyRemaining = AddText("", 10, 267, 153, 29);
-            weeklyReset = AddText("", 163, 267, 295, 29, color: Muted, alignment: ContentAlignment.MiddleRight);
+            weeklyRemaining = AddText("", 10, 267, 120, 29);
+            weeklyReset = AddText("", 130, 267, 328, 29, color: Muted, alignment: ContentAlignment.MiddleRight);
             AddText("重置卡", 10, 308, 153, 28, color: Muted);
             resetCardsValue = AddText("—", 163, 308, 295, 28, color: Muted, alignment: ContentAlignment.MiddleRight);
             pace = new Button { Text = "›   按节奏预算", Bounds = new Rectangle(8, 342, 200, 30), Font = budgetFont,
@@ -188,8 +188,8 @@ namespace DualQuotaBar {
                 status.Text = age.TotalMinutes < 1 ? "刚刚更新" : ((int)age.TotalMinutes) + " 分钟前更新";
             } else status.Text = refreshing ? "正在刷新…" : failed ? "刷新失败，等待重试" : "等待最新额度";
 
-            UpdateRow(shortWindow, shortCurrent, now, shortRemaining, shortReset, shortBar);
-            UpdateRow(weeklyWindow, weeklyCurrent, now, weeklyRemaining, weeklyReset, weeklyBar);
+            UpdateRow(shortWindow, shortCurrent, now, false, shortRemaining, shortReset, shortBar);
+            UpdateRow(weeklyWindow, weeklyCurrent, now, true, weeklyRemaining, weeklyReset, weeklyBar);
             if (snapshot != null && snapshot.ResetCredits.HasValue) {
                 int count = snapshot.ResetCredits.Value;
                 resetCardsValue.Text = count + " 张可用";
@@ -217,17 +217,26 @@ namespace DualQuotaBar {
             }
         }
 
-        static void UpdateRow(Window window, bool current, DateTimeOffset now, Label remaining, Label reset, ProgressLine bar) {
+        static void UpdateRow(Window window, bool current, DateTimeOffset now, bool isWeekly, Label remaining, Label reset, ProgressLine bar) {
             remaining.Text = current ? window.Percent + " 剩余" : "— 剩余";
-            reset.Text = window == null || !window.Reset.HasValue ? "重置时间未知" : ResetText(window.Reset.Value - now);
+            reset.Text = window == null || !window.Reset.HasValue ? "重置时间未知" : ResetText(window.Reset.Value, now, isWeekly);
             bar.SetValue(current ? window.Remaining.Value : 0);
         }
 
-        static string ResetText(TimeSpan time) {
+        static string ResetText(DateTimeOffset resetAt, DateTimeOffset now, bool isWeekly) {
+            TimeSpan time = resetAt - now;
             if (time <= TimeSpan.Zero) return "等待重置确认";
-            if (time.TotalDays >= 1) return String.Format("{0} 天 {1} 小时后重置", (int)time.TotalDays, time.Hours);
-            if (time.TotalMinutes < 1) return "不到 1 分钟后重置";
-            return String.Format("{0} 小时 {1} 分钟后重置", time.Hours, time.Minutes);
+            DateTimeOffset localReset = resetAt.ToLocalTime();
+            DateTimeOffset localNow = now.ToLocalTime();
+            if (isWeekly) {
+                string dateClock = localReset.ToString("M月d日 HH:mm");
+                if (time.TotalDays >= 1) return String.Format("{0} 重置（{1}天{2}时）", dateClock, (int)time.TotalDays, time.Hours);
+                if (time.TotalMinutes < 1) return dateClock + " 重置（<1分）";
+                return String.Format("{0} 重置（{1}小时{2}分）", dateClock, (int)time.TotalHours, time.Minutes);
+            }
+            string clock = localReset.Date == localNow.Date ? localReset.ToString("HH:mm") : "次日 " + localReset.ToString("HH:mm");
+            if (time.TotalMinutes < 1) return clock + " 重置（<1分）";
+            return String.Format("{0} 重置（{1}小时{2}分）", clock, (int)time.TotalHours, time.Minutes);
         }
 
         static string PaceText(Window window, bool current, DateTimeOffset now) {
