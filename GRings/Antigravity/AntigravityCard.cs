@@ -225,7 +225,7 @@ namespace AntigravityQuotaBar {
                 argonValue.ForeColor = Muted;
             }
 
-            bool needSetup = !current && !String.IsNullOrEmpty(error);
+            bool needSetup = !current && !String.IsNullOrEmpty(error) && (AntigravityClient.FindAgyExe() == null || error.IndexOf("登录", StringComparison.Ordinal) >= 0 || error.IndexOf("未检测", StringComparison.Ordinal) >= 0);
             actionButton.Visible = needSetup;
             actionButton.Text = AntigravityClient.FindAgyExe() == null ? "安装官方 agy CLI ▸" : "打开终端登录 agy ▸";
             string key = plan.Text + "|" + status.Text + "|" + primaryRemaining.Text + "|" + primaryReset.Text + "|" + secondaryRemaining.Text + "|" + secondaryReset.Text + "|" + thirdPartyValue.Text + "|" + argonValue.Text + "|" + needSetup;

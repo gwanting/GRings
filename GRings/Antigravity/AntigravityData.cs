@@ -314,12 +314,37 @@ namespace AntigravityQuotaBar {
 
             var snapshot = AntigravitySnapshot.Parse(output);
             if (snapshot == null) {
+                string apiErr = ExtractJsonError(output);
+                if (!String.IsNullOrEmpty(apiErr)) {
+                    if (apiErr.IndexOf("login", StringComparison.OrdinalIgnoreCase) >= 0 || apiErr.IndexOf("auth", StringComparison.OrdinalIgnoreCase) >= 0 || apiErr.IndexOf("unauthenticated", StringComparison.OrdinalIgnoreCase) >= 0) {
+                        throw new Exception("agy 尚未登录，请先在终端运行 agy 登录");
+                    }
+                    if (apiErr.IndexOf("EOF", StringComparison.OrdinalIgnoreCase) >= 0 || apiErr.IndexOf("timeout", StringComparison.OrdinalIgnoreCase) >= 0 || apiErr.IndexOf("connect", StringComparison.OrdinalIgnoreCase) >= 0 || apiErr.IndexOf("proxy", StringComparison.OrdinalIgnoreCase) >= 0) {
+                        throw new Exception("网络连接失败（请检查代理），等待重试");
+                    }
+                    throw new Exception(apiErr.Length > 48 ? apiErr.Substring(0, 48) + "…" : apiErr);
+                }
                 if (!String.IsNullOrEmpty(output) && (output.IndexOf("login", StringComparison.OrdinalIgnoreCase) >= 0 || output.IndexOf("auth", StringComparison.OrdinalIgnoreCase) >= 0)) {
                     throw new Exception("agy 尚未登录，请先在终端运行 agy 登录");
                 }
                 throw new Exception("未能解析 agy /usage 返回结果");
             }
             return snapshot;
+        }
+
+        static string ExtractJsonError(string raw) {
+            if (String.IsNullOrWhiteSpace(raw)) return null;
+            int a = raw.IndexOf('{'), b = raw.LastIndexOf('}');
+            if (a < 0 || b <= a) return null;
+            try {
+                var dict = new JavaScriptSerializer { MaxJsonLength = 2097152 }.Deserialize<Dictionary<string, object>>(raw.Substring(a, b - a + 1));
+                object errObj;
+                if (dict != null && dict.TryGetValue("error", out errObj) && errObj != null) {
+                    string s = Convert.ToString(errObj).Trim();
+                    return String.IsNullOrEmpty(s) ? null : s;
+                }
+            } catch { }
+            return null;
         }
 
         static string RunProcess(string fileName, string arguments, int timeoutMs) {
@@ -331,6 +356,15 @@ namespace AntigravityQuotaBar {
                 StandardOutputEncoding = Encoding.UTF8,
                 StandardErrorEncoding = Encoding.UTF8
             };
+            try {
+                var destination = new Uri("https://daily-cloudcode-pa.googleapis.com");
+                var proxy = System.Net.WebRequest.GetSystemWebProxy().GetProxy(destination);
+                if (proxy != null && !proxy.Equals(destination)) {
+                    string proxyUrl = proxy.AbsoluteUri.TrimEnd('/');
+                    if (String.IsNullOrEmpty(psi.EnvironmentVariables["HTTPS_PROXY"])) psi.EnvironmentVariables["HTTPS_PROXY"] = proxyUrl;
+                    if (String.IsNullOrEmpty(psi.EnvironmentVariables["HTTP_PROXY"])) psi.EnvironmentVariables["HTTP_PROXY"] = proxyUrl;
+                }
+            } catch { }
             using (var process = Process.Start(psi)) {
                 var outTask = process.StandardOutput.ReadToEndAsync();
                 var errTask = process.StandardError.ReadToEndAsync();
